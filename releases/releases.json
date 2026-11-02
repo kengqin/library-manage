@@ -1,8 +1,53 @@
 {
   "schemaVersion": 1,
   "repository": "kengqin/library-manage",
-  "latest": "0.7.6",
+  "latest": "0.8.0",
   "releases": [
+    {
+      "version": "0.8.0",
+      "date": "2026-11-02",
+      "title": "17 种界面语言与语义化词条",
+      "channel": "stable",
+      "databaseSchema": 6,
+      "published": true,
+      "minimumSupportedVersion": "0.6.20",
+      "requiresBackup": false,
+      "releaseUrl": "https://github.com/kengqin/library-manage/releases/tag/v0.8.0",
+      "installerUrl": "https://github.com/kengqin/library-manage/releases/download/v0.8.0/NovelLibrary_0.8.0_x64-setup.exe",
+      "sha256": "",
+      "sections": [
+        {
+          "title": "新增",
+          "items": [
+            "界面语言扩展为 17 种：简体中文、繁體中文、English、日本語、한국어、العربية、Čeština、Deutsch、Español、Français、Bahasa Indonesia、Italiano、Polski、Português (Brasil)、Русский、Türkçe、Tiếng Việt，桌面端、移动端与 Web 端共用同一份字典与插值规则",
+            "桌面端设置新增「界面语言」，移动端设置页新增语言卡片，Web 端左下角新增语言下拉；切换立即生效并记住选择，多窗口同步",
+            "阿拉伯语支持从右到左排版，整页镜像而窗口标题栏按钮仍保持系统位置",
+            "新增 npm run i18n:check 与 i18n 单测，任一语言缺词条或出现旧写法即让测试链失败"
+          ]
+        },
+        {
+          "title": "变更",
+          "items": [
+            "文案由中文原文作 key 改为语义 key，简体中文同样进入字典，调整措辞只改字典、不动组件",
+            "语言标记改为有序前缀表匹配，zh-Hant、zh-HK 正确归到繁体，pt-PT、in-ID、de-AT 等地区变体归到各自主变体",
+            "语言列表按中文、英日韩、其余字母序排列，移动端改为两列网格，Web 端语言入口改为下拉，窄屏不再溢出"
+          ]
+        },
+        {
+          "title": "修复",
+          "items": [
+            "设置窗口侧栏的「版本与更新」在选中时折行，现放宽侧栏并保持标签单行",
+            "Web 端切换语言后页面语言标记被 VitePress 水合覆盖，以及移动菜单「外观」标签不随语言切换的问题",
+            "阿拉伯语下桌面窗口按钮跑到左上角的问题"
+          ]
+        }
+      ],
+      "upgradeNotes": [
+        "数据库 Schema 保持为 6，现有书库、阅读进度、笔记、在线缓存、数据目录和个人设置无需迁移",
+        "首次启动按系统语言自动匹配界面语言，之后记住手动选择，桌面端多窗口共用同一语言",
+        "新增的 11 种语言为初版译文，已按软件界面用语统一术语，后续可在小版本内继续修正措辞"
+      ]
+    },
     {
       "version": "0.7.6",
       "date": "2026-10-30",
