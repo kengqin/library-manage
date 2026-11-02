@@ -308,6 +308,10 @@ try {
   assert.equal(JSON.parse(doctor.stdout).ok, true)
   console.log('Local Runtime end-to-end test passed')
 } finally {
-  if (child && child.exitCode === null) child.kill()
-  await fs.rm(root, { recursive: true, force: true })
+  if (child && child.exitCode === null && child.signalCode === null) {
+    const closed = new Promise(resolve => child.once('close', resolve))
+    child.kill()
+    await closed
+  }
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }

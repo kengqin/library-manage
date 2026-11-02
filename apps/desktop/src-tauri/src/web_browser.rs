@@ -155,6 +155,58 @@ fn ensure_shell(app: &AppHandle, mode: BrowserMode) -> Result<(), String> {
     crate::show_auxiliary_window(&window)
 }
 
+fn owner_is_foreground(window: &tauri::Window) -> bool {
+    #[cfg(windows)]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn GetForegroundWindow() -> *mut std::ffi::c_void;
+        }
+        window
+            .hwnd()
+            .ok()
+            .is_some_and(|hwnd| unsafe { hwnd.0 == GetForegroundWindow() })
+    }
+    #[cfg(not(windows))]
+    {
+        window.is_focused().unwrap_or(false)
+    }
+}
+
+#[cfg(windows)]
+fn pointer_is_inside_menu(window: &tauri::Window, bounds: &BrowserBounds) -> bool {
+    #[repr(C)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetCursorPos(point: *mut Point) -> i32;
+        fn ScreenToClient(hwnd: *mut std::ffi::c_void, point: *mut Point) -> i32;
+    }
+    let (Ok(hwnd), Ok(scale)) = (window.hwnd(), window.scale_factor()) else {
+        return false;
+    };
+    let mut point = Point { x: 0, y: 0 };
+    unsafe {
+        if GetCursorPos(&mut point) == 0 || ScreenToClient(hwnd.0, &mut point) == 0 {
+            return false;
+        }
+    }
+    bounds.contains(f64::from(point.x) / scale, f64::from(point.y) / scale)
+}
+
+fn menu_dismissed_by_window_event(event: &tauri::WindowEvent, foreground: bool) -> bool {
+    match event {
+        tauri::WindowEvent::Focused(false) => !foreground,
+        tauri::WindowEvent::Moved(_)
+        | tauri::WindowEvent::Resized(_)
+        | tauri::WindowEvent::CloseRequested { .. } => true,
+        _ => false,
+    }
+}
+
 // This page has no local application capabilities. Only the local toolbar can invoke commands.
 fn create_page(
     app: &AppHandle,
@@ -232,14 +284,16 @@ fn create_page(
                     #[link(name = "user32")]
                     extern "system" {
                         fn GetAsyncKeyState(key: i32) -> i16;
-                        fn GetForegroundWindow() -> *mut std::ffi::c_void;
                     }
                     // Page scripts and controller creation can focus the page without a user click.
-                    let owner_is_foreground = focus_app
-                        .get_window(host(current.mode))
-                        .and_then(|window| window.hwnd().ok())
-                        .is_some_and(|hwnd| hwnd.0 == GetForegroundWindow());
-                    if current.menu_open && owner_is_foreground && GetAsyncKeyState(1) < 0 {
+                    let owner = focus_app.get_window(host(current.mode));
+                    let foreground = owner.as_ref().is_some_and(owner_is_foreground);
+                    let inside_menu = owner
+                        .as_ref()
+                        .zip(current.menu_bounds.as_ref())
+                        .is_some_and(|(window, bounds)| pointer_is_inside_menu(window, bounds));
+                    // Clicking the menu can briefly focus the page while WebView2 transfers focus.
+                    if current.menu_open && foreground && GetAsyncKeyState(1) < 0 && !inside_menu {
                         hide_menu(&focus_app);
                     }
                     let _ = focus_app.emit_to(host(current.mode), "web-browser-page-focused", ());
@@ -509,6 +563,9 @@ pub struct BrowserBounds {
     height: f64,
 }
 impl BrowserBounds {
+    fn contains(&self, x: f64, y: f64) -> bool {
+        x >= self.x && y >= self.y && x < self.x + self.width && y < self.y + self.height
+    }
     fn valid(&self) -> bool {
         [self.x, self.y, self.width, self.height]
             .iter()
@@ -759,13 +816,8 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
             .app_handle()
             .get_webview(MENU)
             .is_some_and(|menu| menu.window().label() == window.label())
-        && matches!(
-            event,
-            tauri::WindowEvent::Focused(false)
-                | tauri::WindowEvent::Moved(_)
-                | tauri::WindowEvent::Resized(_)
-                | tauri::WindowEvent::CloseRequested { .. }
-        )
+        // A child webview receiving focus does not deactivate its owner window.
+        && menu_dismissed_by_window_event(event, owner_is_foreground(window))
     {
         hide_menu(window.app_handle());
     }
@@ -935,6 +987,39 @@ pub async fn show_web_browser_menu(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn child_webview_focus_does_not_dismiss_the_menu() {
+        assert!(!menu_dismissed_by_window_event(
+            &tauri::WindowEvent::Focused(false),
+            true
+        ));
+        assert!(menu_dismissed_by_window_event(
+            &tauri::WindowEvent::Focused(false),
+            false
+        ));
+        assert!(!menu_dismissed_by_window_event(
+            &tauri::WindowEvent::Focused(true),
+            true
+        ));
+        assert!(menu_dismissed_by_window_event(
+            &tauri::WindowEvent::Moved(tauri::PhysicalPosition::new(1, 2)),
+            true
+        ));
+    }
+    #[test]
+    fn menu_hit_testing_preserves_clicks_in_the_menu_and_zoom_submenu() {
+        let bounds = BrowserBounds {
+            x: 602.5,
+            y: 82.0,
+            width: 368.0,
+            height: 224.0,
+        };
+        assert!(bounds.contains(610.0, 200.0));
+        assert!(bounds.contains(850.0, 120.0));
+        assert!(!bounds.contains(602.0, 120.0));
+        assert!(!bounds.contains(850.0, 306.0));
+        assert!(!bounds.contains(f64::NAN, 120.0));
+    }
     #[test]
     fn menus_stay_inside_the_browser_viewport_even_in_a_narrow_pane() {
         for (width, left) in [

@@ -1,15 +1,50 @@
 {
   "schemaVersion": 1,
   "repository": "kengqin/library-manage",
-  "latest": "0.7.5",
+  "latest": "0.7.6",
   "releases": [
+    {
+      "version": "0.7.6",
+      "date": "2026-10-30",
+      "title": "网页菜单点击修复与 library-manage 命名更新",
+      "channel": "stable",
+      "databaseSchema": 6,
+      "published": true,
+      "minimumSupportedVersion": "0.6.20",
+      "requiresBackup": false,
+      "releaseUrl": "https://github.com/kengqin/library-manage/releases/tag/v0.7.6",
+      "installerUrl": "https://github.com/kengqin/library-manage/releases/download/v0.7.6/NovelLibrary_0.7.6_x64-setup.exe",
+      "sha256": "",
+      "sections": [
+        {
+          "title": "修复",
+          "items": [
+            "修复内置浏览器的更多菜单因子网页焦点切换而提前关闭，导致点击刷新、复制链接、文字缩放和默认浏览器打开未执行的问题",
+            "菜单及缩放子菜单范围内的点击继续交给菜单处理，实际切换到其他窗口或点击网页时正常关闭菜单",
+            "修复 Windows Runtime 回归测试未等待子进程退出就清理数据库文件引起的偶发构建失败"
+          ]
+        },
+        {
+          "title": "优化",
+          "items": [
+            "桌面标题栏、系统窗口标题、托盘及相关应用提示统一为 library-manage",
+            "官方仓库、发布链接与更新服务迁移至 kengqin/library-manage，保留旧客户端的更新下载兼容入口"
+          ]
+        }
+      ],
+      "upgradeNotes": [
+        "数据库 Schema 保持为 6，现有书库、阅读进度、笔记、在线缓存、数据目录和个人设置无需迁移",
+        "安装器和应用标识保持兼容，可直接覆盖升级；新版启动后显示 library-manage 名称",
+        "v0.7.5 未正式公开，本版本包含其全部命名与仓库迁移改动"
+      ]
+    },
     {
       "version": "0.7.5",
       "date": "2026-10-30",
       "title": "library-manage 命名与仓库迁移",
       "channel": "stable",
       "databaseSchema": 6,
-      "published": true,
+      "published": false,
       "minimumSupportedVersion": "0.6.20",
       "requiresBackup": false,
       "releaseUrl": "https://github.com/kengqin/library-manage/releases/tag/v0.7.5",
