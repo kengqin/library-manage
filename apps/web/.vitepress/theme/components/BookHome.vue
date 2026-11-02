@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, LibraryBig, ScrollText } from 'lucide-vue-next'
 import { withBase } from 'vitepress'
@@ -12,7 +13,7 @@ const image = computed(() => {
   const suffix = `/书库/${book.value.slug}/站点/${book.value.cover}`
   return Object.entries(coverModules).find(([file]) => file.endsWith(suffix))?.[1] ?? ''
 })
-const seal = computed(() => book.value.seal || book.value.title.slice(0, 1) || '书')
+const seal = computed(() => book.value.seal || book.value.title.slice(0, 1) || t('unit.bookShort'))
 const heroShift = ref(0)
 const catalogue = ref<HTMLElement | null>(null)
 const catalogueVisible = ref(false)
@@ -52,14 +53,14 @@ onBeforeUnmount(() => {
       <span class="eternal-brand__seal">{{ seal }}</span>
       <span><strong>{{ book.title }}</strong><small>{{ book.author }}</small></span>
     </a>
-    <nav class="eternal-nav__links" aria-label="小说导航">
-      <a :href="withBase('/')">书库</a>
-      <a class="active" :href="withBase(book.topicLink)">专题</a>
-      <a :href="withBase(book.catalogueLink)">完整目录</a>
+    <nav class="eternal-nav__links" :aria-label="t('app.navigation.novel')">
+      <a :href="withBase('/')">{{ t('nav.library') }}</a>
+      <a class="active" :href="withBase(book.topicLink)">{{ t('online.topic') }}</a>
+      <a :href="withBase(book.catalogueLink)">{{ t('contents.full') }}</a>
     </nav>
     <div class="eternal-nav__actions">
-      <a class="book-back" :href="withBase('/')" aria-label="返回书库" title="返回书库"><LibraryBig :size="18" /></a>
-      <a class="eternal-nav__read" :href="withBase(book.firstLink)">开始阅读 <ArrowRight :size="15" /></a>
+      <a class="book-back" :href="withBase('/')" :aria-label="t('library.back')" :title="t('library.back')"><LibraryBig :size="18" /></a>
+      <a class="eternal-nav__read" :href="withBase(book.firstLink)">{{ t('library.startReading') }} <ArrowRight :size="15" /></a>
     </div>
   </header>
 
@@ -68,23 +69,23 @@ onBeforeUnmount(() => {
       <div class="eternal-hero__veil" aria-hidden="true" />
       <div class="eternal-hero__mist eternal-hero__mist--one" aria-hidden="true" />
       <div class="eternal-hero__content">
-        <a class="book-breadcrumb" :href="withBase('/')"><ArrowLeft :size="14" /> 小说书库</a>
+        <a class="book-breadcrumb" :href="withBase('/')"><ArrowLeft :size="14" /> {{ t('app.name') }}</a>
         <p class="eternal-kicker">{{ book.status }} · {{ book.author }}</p>
         <h1><strong>{{ book.title.slice(0, 1) }}</strong><span>{{ book.title.slice(1) }}</span></h1>
         <p class="eternal-lead">{{ book.description }}</p>
-        <blockquote>{{ book.range }} · 共 {{ book.chapterCount }} 章</blockquote>
+        <blockquote>{{ t('contents.rangeTotal', { range: book.range, count: book.chapterCount }) }}</blockquote>
         <div class="eternal-actions">
-          <a class="eternal-button eternal-button--primary" :href="withBase(book.firstLink)"><BookOpen :size="18" /> 开始阅读 <ArrowRight :size="17" /></a>
-          <a class="eternal-button eternal-button--ghost" href="#catalogue"><ScrollText :size="18" /> 查看目录</a>
+          <a class="eternal-button eternal-button--primary" :href="withBase(book.firstLink)"><BookOpen :size="18" /> {{ t('library.startReading') }} <ArrowRight :size="17" /></a>
+          <a class="eternal-button eternal-button--ghost" href="#catalogue"><ScrollText :size="18" /> {{ t('contents.view') }}</a>
         </div>
       </div>
-      <a class="eternal-scroll" href="#catalogue"><span>章节目录</span><ChevronDown :size="19" /></a>
+      <a class="eternal-scroll" href="#catalogue"><span>{{ t('contents.chapterList') }}</span><ChevronDown :size="19" /></a>
     </section>
 
     <section id="catalogue" ref="catalogue" class="eternal-catalogue" :class="{ 'is-visible': catalogueVisible }">
       <div class="eternal-catalogue__intro">
-        <div><p class="section-mark">TABLE OF CONTENTS</p><h2>{{ book.title }} · 目录</h2><p>章节按篇幅分段收纳，点击任一分段即可开始连续阅读。</p></div>
-        <div class="volume-seal"><span>{{ book.status }}</span><strong>{{ book.chapterCount }}</strong><small>章</small></div>
+        <div><p class="section-mark">TABLE OF CONTENTS</p><h2>{{ t('contents.titleOf', { title: book.title }) }}</h2><p>{{ t('contents.groupedHint') }}</p></div>
+        <div class="volume-seal"><span>{{ book.status }}</span><strong>{{ book.chapterCount }}</strong><small>{{ t('unit.chaptersShort') }}</small></div>
       </div>
       <div class="chapter-list range-list">
         <a v-for="(group, index) in groups" :key="group.group" :href="withBase(group.first.link)" class="chapter-entry" :style="{ '--entry-index': index }">
@@ -93,7 +94,7 @@ onBeforeUnmount(() => {
           <ArrowRight :size="17" />
         </a>
       </div>
-      <a class="catalogue-all" :href="withBase(book.catalogueLink)"><ScrollText :size="18" /> 查看完整章节目录 <ArrowRight :size="17" /></a>
+      <a class="catalogue-all" :href="withBase(book.catalogueLink)"><ScrollText :size="18" /> {{ t('contents.viewFull') }} <ArrowRight :size="17" /></a>
     </section>
   </main>
 </template>

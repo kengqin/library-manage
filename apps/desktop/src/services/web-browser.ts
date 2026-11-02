@@ -1,3 +1,4 @@
+import { t } from '@novel-library/i18n/vue'
 import { ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { emitTo, listen } from '@tauri-apps/api/event'
@@ -30,7 +31,7 @@ export function initializeWebBrowser() {
     listen<WebBrowserState>('web-browser-state', ({ payload }) => accept(payload)),
     listen('web-browser-edit-address', () => { browserAddressRequest.value++ }),
     listen('web-browser-copied', () => {
-      if (getCurrentWebview().label === (webBrowser.value.mode === 'side' ? 'main' : 'web-browser')) showGlobalMessage('链接已复制')
+      if (getCurrentWebview().label === (webBrowser.value.mode === 'side' ? 'main' : 'web-browser')) showGlobalMessage(t('common.linkCopied'))
     })
   ]).then(async () => {
     // An unopened browser must not overwrite the saved preference on app startup.
@@ -42,7 +43,7 @@ export function initializeWebBrowser() {
 export async function refreshWebBrowser() { webBrowser.value = await invoke<WebBrowserState>('get_web_browser_state') }
 export async function openWebPage(url: string) {
   const safe = webPageUrl(url)
-  if (!safe) throw new Error('请输入 HTTP 或 HTTPS 网页地址')
+  if (!safe) throw new Error(t('browser.url.invalidAddress'))
   if (!isTauri()) { window.open(safe, '_blank', 'noopener,noreferrer'); return }
   await initializeWebBrowser()
   await invoke('open_web_browser', { url: safe, mode: browserMode(), newTab: true })
@@ -52,7 +53,7 @@ export function browserAddress(value: string) {
   if (!input) return undefined
   if (/^[a-z][a-z\d+.-]*:/iu.test(input)) {
     const url = webPageUrl(input)
-    if (!url) throw new Error('只支持 HTTP 或 HTTPS 网页地址')
+    if (!url) throw new Error(t('browser.url.onlyHttp'))
     return url
   }
   if (/^[^\s/]+\.[^\s/]+(?:[/:?#]|$)/u.test(input)) return webPageUrl('https://' + input)

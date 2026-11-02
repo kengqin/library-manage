@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -99,26 +100,26 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <section ref="panel" class="web-browser-panel" :class="{ 'web-browser-panel--side': !standalone, 'is-resizing': resizing }" :style="!standalone ? { width: `${browserSideWidth}px` } : undefined" aria-label="内置网页浏览器">
-    <div v-if="!standalone" class="browser-splitter" role="separator" tabindex="0" aria-label="调整网页侧栏宽度" aria-orientation="vertical" :aria-valuenow="browserSideWidth" :aria-valuemin="320" :aria-valuemax="maximumWidth" @pointerdown.prevent="drag" @pointermove="move" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag" @keydown="resizeKey" />
+  <section ref="panel" class="web-browser-panel" :class="{ 'web-browser-panel--side': !standalone, 'is-resizing': resizing }" :style="!standalone ? { width: `${browserSideWidth}px` } : undefined" :aria-label="t('browser.title')">
+    <div v-if="!standalone" class="browser-splitter" role="separator" tabindex="0" :aria-label="t('browser.sidebarResize')" aria-orientation="vertical" :aria-valuenow="browserSideWidth" :aria-valuemin="320" :aria-valuemax="maximumWidth" @pointerdown.prevent="drag" @pointermove="move" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag" @keydown="resizeKey" />
     <header class="web-browser-toolbar" :class="{ 'is-editing': editing }" @mousedown="startDragging" @dblclick.self="standalone && action(maximize)">
       <div v-if="standalone" class="browser-navigation">
-        <button type="button" class="browser-icon" aria-label="后退" title="后退" :disabled="!webBrowser.canGoBack" @click="action(() => webBrowserAction('back'))"><ArrowLeft :size="15" /></button>
-        <button type="button" class="browser-icon" aria-label="前进" title="前进" :disabled="!webBrowser.canGoForward" @click="action(() => webBrowserAction('forward'))"><ArrowRight :size="15" /></button>
-        <button type="button" class="browser-icon" :aria-label="webBrowser.loading ? '停止加载' : '刷新网页'" :title="webBrowser.loading ? '停止加载' : '刷新网页'" @click="action(() => webBrowserAction(webBrowser.loading ? 'stop' : 'reload'))"><X v-if="webBrowser.loading" :size="15" /><RefreshCw v-else :size="14" /></button>
+        <button type="button" class="browser-icon" :aria-label="t('common.back')" :title="t('common.back')" :disabled="!webBrowser.canGoBack" @click="action(() => webBrowserAction('back'))"><ArrowLeft :size="15" /></button>
+        <button type="button" class="browser-icon" :aria-label="t('common.forward')" :title="t('common.forward')" :disabled="!webBrowser.canGoForward" @click="action(() => webBrowserAction('forward'))"><ArrowRight :size="15" /></button>
+        <button type="button" class="browser-icon" :aria-label="webBrowser.loading ? t('browser.stop') : t('browser.reload')" :title="webBrowser.loading ? t('browser.stop') : t('browser.reload')" @click="action(() => webBrowserAction(webBrowser.loading ? 'stop' : 'reload'))"><X v-if="webBrowser.loading" :size="15" /><RefreshCw v-else :size="14" /></button>
       </div>
       <BrowserTabs :compact="!standalone" @edit="editAddress" />
-      <form v-if="editing" ref="addressForm" class="browser-address" @submit.prevent="navigate" @focusout="addressFocusOut"><Search :size="14" /><input ref="addressInput" v-model="address" aria-label="网址或搜索关键词" placeholder="搜索，或输入网址" :disabled="busy" /><button type="submit" class="browser-icon" aria-label="前往" :disabled="busy"><ArrowRight :size="14" /></button></form>
-      <button v-else-if="standalone" type="button" class="browser-search browser-icon" aria-label="输入网址或搜索" title="输入网址或搜索" @click="editAddress"><Search :size="15" /></button>
+      <form v-if="editing" ref="addressForm" class="browser-address" @submit.prevent="navigate" @focusout="addressFocusOut"><Search :size="14" /><input ref="addressInput" v-model="address" :aria-label="t('search.placeholder.query')" :placeholder="t('search.placeholder.simple')" :disabled="busy" /><button type="submit" class="browser-icon" :aria-label="t('common.go')" :disabled="busy"><ArrowRight :size="14" /></button></form>
+      <button v-else-if="standalone" type="button" class="browser-search browser-icon" :aria-label="t('search.placeholder.url')" :title="t('search.placeholder.url')" @click="editAddress"><Search :size="15" /></button>
       <div class="browser-toolbar-space" @dblclick="standalone && action(maximize)" />
       <div class="browser-tools">
-        <button type="button" class="browser-icon" :aria-label="standalone ? '侧边打开' : '独立窗口打开'" :title="standalone ? '侧边打开' : '独立窗口打开'" @click="action(() => changeWebBrowserMode(standalone ? 'side' : 'window'))"><BrowserModeIcon :docked="!standalone" /></button>
-        <button type="button" class="browser-icon" aria-label="网页更多操作" title="更多" :aria-expanded="Boolean(webBrowser.menuOpen)" @click="more"><CircleEllipsis :size="18" :stroke-width="1.5" /></button>
+        <button type="button" class="browser-icon" :aria-label="standalone ? t('browser.openSide') : t('window.openSeparate')" :title="standalone ? t('browser.openSide') : t('window.openSeparate')" @click="action(() => changeWebBrowserMode(standalone ? 'side' : 'window'))"><BrowserModeIcon :docked="!standalone" /></button>
+        <button type="button" class="browser-icon" :aria-label="t('browser.actions.more')" :title="t('common.more')" :aria-expanded="Boolean(webBrowser.menuOpen)" @click="more"><CircleEllipsis :size="18" :stroke-width="1.5" /></button>
       </div>
-      <div v-if="standalone" class="browser-window-controls"><button type="button" aria-label="最小化" title="最小化" @click="action(() => getCurrentWindow().minimize())"><Minus :size="14" /></button><button type="button" :aria-label="maximized ? '还原' : '最大化'" :title="maximized ? '还原' : '最大化'" @click="action(maximize)"><Copy v-if="maximized" :size="12" /><Square v-else :size="12" /></button><button type="button" class="browser-window-close" aria-label="关闭窗口" title="关闭" @click="action(closeWebBrowser)"><X :size="16" /></button></div>
+      <div v-if="standalone" class="browser-window-controls"><button type="button" :aria-label="t('window.minimize')" :title="t('window.minimize')" @click="action(() => getCurrentWindow().minimize())"><Minus :size="14" /></button><button type="button" :aria-label="maximized ? t('window.restore') : t('window.maximize')" :title="maximized ? t('window.restore') : t('window.maximize')" @click="action(maximize)"><Copy v-if="maximized" :size="12" /><Square v-else :size="12" /></button><button type="button" class="browser-window-close" :aria-label="t('window.close')" :title="t('common.close')" @click="action(closeWebBrowser)"><X :size="16" /></button></div>
     </header>
-    <div v-if="webBrowser.loading" class="browser-progress" aria-label="网页加载中"><span /></div>
-    <div v-if="error" class="browser-error" role="alert"><span>{{ error }}</span><button type="button" class="browser-icon" aria-label="关闭提示" @click="error = ''"><X :size="13" /></button></div>
+    <div v-if="webBrowser.loading" class="browser-progress" :aria-label="t('browser.loading')"><span /></div>
+    <div v-if="error" class="browser-error" role="alert"><span>{{ error }}</span><button type="button" class="browser-icon" :aria-label="t('common.dismiss')" @click="error = ''"><X :size="13" /></button></div>
     <div ref="surface" class="web-browser-surface" />
   </section>
 </template>

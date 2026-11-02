@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, ref } from 'vue'
 import { ArrowLeft, ArrowRight, Search, X } from 'lucide-vue-next'
 import { withBase } from 'vitepress'
@@ -28,17 +29,17 @@ const groups = computed(() => {
 <template>
   <main class="book-catalogue-page">
     <header class="catalogue-header">
-      <a :href="withBase(book.topicLink)"><ArrowLeft :size="16" /> 返回专题</a>
+      <a :href="withBase(book.topicLink)"><ArrowLeft :size="16" /> {{ t('online.topic.back') }}</a>
       <p>TABLE OF CONTENTS</p>
-      <h1>{{ book.title }} · 完整目录</h1>
-      <span>{{ book.range }}，共 {{ book.chapterCount }} 章</span>
+      <h1>{{ book.title }} {{ t('contents.fullSuffix') }}</h1>
+      <span>{{ t('contents.rangeTotalComma', { range: book.range, count: book.chapterCount }) }}</span>
     </header>
 
     <div class="catalogue-search">
       <Search :size="18" />
-      <input v-model="query" type="search" :placeholder="`搜索${book.title}的章号或章名`" aria-label="搜索章节" />
-      <button v-if="query" type="button" aria-label="清空搜索" @click="query = ''"><X :size="17" /></button>
-      <output>{{ filteredChapters.length }} 章</output>
+      <input v-model="query" type="search" :placeholder="`搜索${book.title}的章号或章名`" :aria-label="t('contents.search')" />
+      <button v-if="query" type="button" :aria-label="t('search.clear')" @click="query = ''"><X :size="17" /></button>
+      <output>{{ t('unit.chapters', { count: filteredChapters.length }) }}</output>
     </div>
 
     <div v-if="groups.length" class="catalogue-groups">
@@ -53,6 +54,6 @@ const groups = computed(() => {
         </div>
       </section>
     </div>
-    <p v-else class="catalogue-empty">没有找到匹配章节</p>
+    <p v-else class="catalogue-empty">{{ t('contents.search.emptyShort') }}</p>
   </main>
 </template>

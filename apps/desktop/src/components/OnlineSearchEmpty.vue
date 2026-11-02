@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { Trash2, X } from 'lucide-vue-next'
 defineProps<{ recent: string[] }>()
 defineEmits<{ search: [query: string]; remove: [query: string]; clear: [] }>()
@@ -19,13 +20,13 @@ defineEmits<{ search: [query: string]; remove: [query: string]; clear: [] }>()
       <circle cx="174" cy="83" r="2" fill="var(--ui-text-3)" opacity=".25" />
       <path d="M163 22V30M159 26H167" stroke="var(--ui-accent)" stroke-linecap="round" opacity=".3" />
     </svg>
-    <span>发现下一本好书</span>
-    <div v-if="recent.length" class="online-recent" aria-label="最近搜索">
+    <span>{{ t('online.discover') }}</span>
+    <div v-if="recent.length" class="online-recent" :aria-label="t('search.recent')">
       <div v-for="query in recent.slice(0, 4)" :key="query" class="online-recent-chip">
         <button type="button" class="online-recent-query" :title="query" @click="$emit('search', query)">{{ query }}</button>
-        <button type="button" class="online-recent-remove" :aria-label="`删除搜索记录：${query}`" title="删除记录" @click="$emit('remove', query)"><X :size="11" /></button>
+        <button type="button" class="online-recent-remove" :aria-label="`删除搜索记录：${query}`" :title="t('common.deleteRecord')" @click="$emit('remove', query)"><X :size="11" /></button>
       </div>
-      <button type="button" class="online-recent-clear" aria-label="清空搜索记录" title="清空搜索记录" @click="$emit('clear')"><Trash2 :size="13" /></button>
+      <button type="button" class="online-recent-clear" :aria-label="t('search.clearHistory')" :title="t('search.clearHistory')" @click="$emit('clear')"><Trash2 :size="13" /></button>
     </div>
   </div>
 </template>

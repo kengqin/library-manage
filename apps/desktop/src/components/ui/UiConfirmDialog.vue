@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { nextTick, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
@@ -11,8 +12,8 @@ const props = withDefaults(defineProps<{
   busy?: boolean
   confirmDisabled?: boolean
 }>(), {
-  confirmLabel: '确认',
-  cancelLabel: '取消',
+  confirmLabel: t('common.confirm'),
+  cancelLabel: t('common.cancel'),
   danger: false,
   busy: false,
   confirmDisabled: false
@@ -50,7 +51,7 @@ function cancel(event: Event) {
       <div class="ui-dialog-actions">
         <button type="button" class="secondary-command" :disabled="busy" @click="close">{{ cancelLabel }}</button>
         <button type="button" :class="danger ? 'danger-command-filled' : 'primary-command'" :disabled="busy || confirmDisabled" @click="emit('confirm')">
-          {{ busy ? '正在处理' : confirmLabel }}
+          {{ busy ? t('common.working') : confirmLabel }}
         </button>
       </div>
     </dialog>

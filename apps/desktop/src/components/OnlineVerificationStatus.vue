@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { ArrowUpRight, ShieldCheck, X } from 'lucide-vue-next'
 import { cancelOnlineVerification, onlineVerifications, showOnlineVerification } from '../services/online-browser'
 import { showGlobalError } from '../services/global-message'
 const hostname = (url: string) => new URL(url).hostname
-const open = (id: string) => showOnlineVerification(id).catch(cause => showGlobalError(cause, '无法打开验证窗口'))
-const cancel = (id: string) => cancelOnlineVerification(id).catch(cause => showGlobalError(cause, '无法取消验证'))
+const open = (id: string) => showOnlineVerification(id).catch(cause => showGlobalError(cause, t('browser.verify.openFailed')))
+const cancel = (id: string) => cancelOnlineVerification(id).catch(cause => showGlobalError(cause, t('browser.verify.cancelFailed')))
 </script>
 
 <template>
@@ -12,9 +13,9 @@ const cancel = (id: string) => cancelOnlineVerification(id).catch(cause => showG
     <div v-if="onlineVerifications.length" class="online-verifications" aria-live="polite">
       <div v-for="item in onlineVerifications" :key="item.requestId" class="online-verification" role="status">
         <ShieldCheck :size="17" aria-hidden="true" />
-        <span><strong>{{ hostname(item.url) }}</strong><small>等待网页验证</small></span>
-        <button type="button" class="text-command" @click="open(item.requestId)">打开窗口<ArrowUpRight :size="13" /></button>
-        <button type="button" class="icon-button" aria-label="取消网页验证" @click="cancel(item.requestId)"><X :size="15" /></button>
+        <span><strong>{{ hostname(item.url) }}</strong><small>{{ t('browser.verify.waiting') }}</small></span>
+        <button type="button" class="text-command" @click="open(item.requestId)">{{ t('window.open') }}<ArrowUpRight :size="13" /></button>
+        <button type="button" class="icon-button" :aria-label="t('browser.verify.cancel')" @click="cancel(item.requestId)"><X :size="15" /></button>
       </div>
     </div>
   </Teleport>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Search } from 'lucide-vue-next'
@@ -24,10 +25,10 @@ async function search() {
 
 <template>
   <section class="page search-page">
-    <header class="page-header"><div><span class="eyebrow">LOCAL SEARCH</span><h1>全文搜索</h1></div></header>
-    <form class="search-box" @submit.prevent="search"><Search :size="20" /><input v-model="query" type="search" placeholder="书名、作者、章名或正文" /><button type="submit" :disabled="searching || !query.trim()">{{ searching ? '搜索中' : '搜索' }}</button></form>
+    <header class="page-header"><div><span class="eyebrow">LOCAL SEARCH</span><h1>{{ t('search.fullText') }}</h1></div></header>
+    <form class="search-box" @submit.prevent="search"><Search :size="20" /><input v-model="query" type="search" :placeholder="t('search.hint.fullText')" /><button type="submit" :disabled="searching || !query.trim()">{{ searching ? t('common.searching') : t('nav.search') }}</button></form>
     <p v-if="error" class="error-card">{{ error }}</p>
-    <div v-if="searched && !results.length" class="status-card">没有找到匹配内容</div>
+    <div v-if="searched && !results.length" class="status-card">{{ t('contents.search.noMatch') }}</div>
     <div class="search-results"><button v-for="result in results" :key="`${result.bookId}:${result.chapterNumber}`" type="button" @click="router.push(`/read/${result.bookId}/${result.chapterNumber}`)"><span><small>{{ result.bookTitle }}</small><strong>{{ result.chapterTitle }}</strong><p>{{ result.snippet }}</p></span><ArrowRight :size="18" /></button></div>
   </section>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, LogOut, Minus, Moon, Pin, Plus, RotateCcw, Settings2, Sun } from 'lucide-vue-next'
@@ -133,7 +134,7 @@ function chapterHeading() {
   const label = chapterDisplayLabel()
   if (/^第[零〇一二两三四五六七八九十百千万\d]+[章节回]/u.test(chapter.value.title)) return chapter.value.title
   const ordinal = chapters.value.filter(isNumberedChapter).findIndex(item => item.number === chapter.value?.number) + 1
-  return `${label || `第${Math.max(1, ordinal)}章`} ${chapter.value.title}`
+  return `${label || t('contents.chapterNCompact', { number: Math.max(1, ordinal) })} ${chapter.value.title}`
 }
 
 const chapterMetadata = computed(() => {
@@ -141,7 +142,7 @@ const chapterMetadata = computed(() => {
   return [
     book.value.title,
     book.value.author?.trim() || '',
-    `${chapter.value.wordCount.toLocaleString('zh-CN')} 字`,
+    t('unit.words', { count: chapter.value.wordCount.toLocaleString() }),
   ].filter(Boolean).join('\u2002·\u2002')
 })
 
@@ -182,7 +183,7 @@ async function togglePrivacyAlwaysOnTop() {
     await getCurrentWindow().setAlwaysOnTop(nextValue)
     privacyAlwaysOnTop.value = nextValue
   } catch (cause) {
-    showGlobalError(cause, nextValue ? '窗口置顶失败，请稍后重试' : '取消窗口置顶失败，请稍后重试')
+    showGlobalError(cause, nextValue ? t('window.alwaysOnTop.failed') : t('window.unpin.failed'))
   }
 }
 
@@ -366,7 +367,7 @@ async function enterPrivacyMode(progressOverride?: number) {
     } catch (restoreError) {
       console.warn('privacy-window-restore-failed', restoreError)
     }
-    showGlobalError(cause, '隐私模式进入失败，请稍后重试')
+    showGlobalError(cause, t('app.privacyMode.failed'))
   }
 }
 
@@ -387,7 +388,7 @@ async function leavePrivacyMode() {
   try {
     await restoreReaderWindow()
   } catch (cause) {
-    showGlobalError(cause, '普通阅读窗口恢复失败，请重启应用后重试')
+    showGlobalError(cause, t('window.readerRestoreFailed'))
   }
   if (scrollRoot) {
     await nextTick()
@@ -405,7 +406,7 @@ async function persistProgress(progress: number) {
     progressSaveFailed = false
   } catch (cause) {
     if (!progressSaveFailed) {
-      showGlobalError(cause, '阅读进度保存失败，请稍后重试')
+      showGlobalError(cause, t('reader.progress.saveFailed'))
     }
     progressSaveFailed = true
   }
@@ -507,7 +508,7 @@ async function load() {
       getDesktopChapter(bookId.value, chapterNumber.value)
     ])
     if (generation !== loadGeneration) return
-    if (!nextBook || !nextChapter) throw new Error('章节不存在或已被删除')
+    if (!nextBook || !nextChapter) throw new Error(t('contents.error.notFound'))
     book.value = nextBook
     chapters.value = nextChapters
     chapter.value = nextChapter
@@ -529,7 +530,7 @@ async function load() {
   } catch (cause) {
     if (generation !== loadGeneration) return
     loadError.value = cause instanceof Error ? cause.message : String(cause)
-    showGlobalError(cause, '章节加载失败，请返回目录后重试')
+    showGlobalError(cause, t('contents.error.loadFailed'))
   } finally {
     if (generation === loadGeneration) loading.value = false
   }
@@ -636,7 +637,7 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
       '--privacy-text-color': privacyTextColor
     }"
   >
-    <main v-if="privacyMode" class="privacy-reader" aria-label="隐私模式" @mousedown.left="startPrivacyDragging" @mouseleave="privacySettingsOpen = false" @wheel.prevent="handlePrivacyWheel">
+    <main v-if="privacyMode" class="privacy-reader" :aria-label="t('app.privacyMode')" @mousedown.left="startPrivacyDragging" @mouseleave="privacySettingsOpen = false" @wheel.prevent="handlePrivacyWheel">
       <span class="privacy-resize-handle privacy-resize-handle--north" aria-hidden="true" @mousedown.left.stop.prevent="startPrivacyResize('North')" />
       <span class="privacy-resize-handle privacy-resize-handle--south" aria-hidden="true" @mousedown.left.stop.prevent="startPrivacyResize('South')" />
       <span class="privacy-resize-handle privacy-resize-handle--east" aria-hidden="true" @mousedown.left.stop.prevent="startPrivacyResize('East')" />
@@ -649,11 +650,11 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         <p v-for="line in privacyWindow.lines" :key="line.start">{{ line.text || ' ' }}</p>
       </div>
       <div class="privacy-reader-chapter-controls" @mousedown.stop="preventPrivacyPointerFocus">
-        <small class="privacy-reader-status" title="当前章节 / 总章节 · 本章进度">{{ privacyStatusLabel }}</small>
+        <small class="privacy-reader-status" :title="t('reader.progressHint')">{{ privacyStatusLabel }}</small>
         <button
           type="button"
-          title="上一章（← / A）"
-          aria-label="上一章"
+          :title="t('reader.prevChapterShortcut')"
+          :aria-label="t('reader.prevChapter')"
           aria-keyshortcuts="ArrowLeft A"
           :disabled="!previous"
           @click="previous && openChapter(previous.number)"
@@ -662,8 +663,8 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         </button>
         <button
           type="button"
-          title="下一章（→ / D）"
-          aria-label="下一章"
+          :title="t('reader.nextChapterShortcut')"
+          :aria-label="t('reader.nextChapter')"
           aria-keyshortcuts="ArrowRight D"
           :disabled="!next"
           @click="next && openChapter(next.number)"
@@ -671,26 +672,26 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
           <ChevronRight :size="14" />
         </button>
       </div>
-      <div v-if="privacySettingsOpen" class="privacy-reader-settings" role="dialog" aria-label="隐私模式设置" @mousedown.stop="preventPrivacyPointerFocus" @wheel.stop>
+      <div v-if="privacySettingsOpen" class="privacy-reader-settings" role="dialog" :aria-label="t('app.privacyMode.settings')" @mousedown.stop="preventPrivacyPointerFocus" @wheel.stop>
         <div class="privacy-setting-row">
-          <span>字号</span>
+          <span>{{ t('reader.typography.fontSize') }}</span>
           <div class="privacy-setting-stepper">
-            <button type="button" title="减小字号" :disabled="privacyFontSize <= 10" @click="privacyFontSize = Math.max(10, privacyFontSize - 1)"><Minus :size="12" /></button>
+            <button type="button" :title="t('reader.fontSize.decrease')" :disabled="privacyFontSize <= 10" @click="privacyFontSize = Math.max(10, privacyFontSize - 1)"><Minus :size="12" /></button>
             <output>{{ privacyFontSize }}</output>
-            <button type="button" title="增大字号" :disabled="privacyFontSize >= 20" @click="privacyFontSize = Math.min(20, privacyFontSize + 1)"><Plus :size="12" /></button>
+            <button type="button" :title="t('reader.fontSize.increase')" :disabled="privacyFontSize >= 20" @click="privacyFontSize = Math.min(20, privacyFontSize + 1)"><Plus :size="12" /></button>
           </div>
         </div>
         <div class="privacy-setting-row">
-          <span>行距</span>
+          <span>{{ t('reader.typography.lineHeight') }}</span>
           <div class="privacy-setting-segments">
-            <button v-for="item in ([['紧', 1.7], ['中', 1.9], ['松', 2.1]] as const)" :key="item[0]" type="button" :class="{ active: privacyLineHeight === item[1] }" @click="privacyLineHeight = item[1]">{{ item[0] }}</button>
+            <button v-for="item in ([[t('reader.lineHeight.tight'), 1.7], [t('library.size.medium'), 1.9], [t('reader.lineHeight.loose'), 2.1]] as const)" :key="item[0]" type="button" :class="{ active: privacyLineHeight === item[1] }" @click="privacyLineHeight = item[1]">{{ item[0] }}</button>
           </div>
         </div>
         <div class="privacy-setting-row">
-          <span>文字</span>
+          <span>{{ t('reader.typography') }}</span>
           <div class="privacy-setting-color-picker">
-            <input type="color" :value="privacyTextColor" title="选择文字颜色" aria-label="选择文字颜色" @input="setPrivacyTextColor" />
-            <button type="button" title="恢复默认文字颜色" aria-label="恢复默认文字颜色" :disabled="!privacyCustomTextColor" @click="privacyCustomTextColor = ''"><RotateCcw :size="12" /></button>
+            <input type="color" :value="privacyTextColor" :title="t('reader.textColor.choose')" :aria-label="t('reader.textColor.choose')" @input="setPrivacyTextColor" />
+            <button type="button" :title="t('reader.textColor.reset')" :aria-label="t('reader.textColor.reset')" :disabled="!privacyCustomTextColor" @click="privacyCustomTextColor = ''"><RotateCcw :size="12" /></button>
           </div>
         </div>
       </div>
@@ -698,8 +699,8 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         <button
           type="button"
           :class="{ active: privacySettingsOpen }"
-          title="隐私模式设置"
-          aria-label="隐私模式设置"
+          :title="t('app.privacyMode.settings')"
+          :aria-label="t('app.privacyMode.settings')"
           :aria-expanded="privacySettingsOpen"
           @click="privacySettingsOpen = !privacySettingsOpen"
         >
@@ -708,8 +709,8 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         <button
           type="button"
           :class="{ active: privacyAlwaysOnTop }"
-          :title="privacyAlwaysOnTop ? '取消窗口置顶' : '窗口置顶'"
-          :aria-label="privacyAlwaysOnTop ? '取消窗口置顶' : '窗口置顶'"
+          :title="privacyAlwaysOnTop ? t('window.unpin') : t('window.alwaysOnTop')"
+          :aria-label="privacyAlwaysOnTop ? t('window.unpin') : t('window.alwaysOnTop')"
           :aria-pressed="privacyAlwaysOnTop"
           @click="togglePrivacyAlwaysOnTop"
         >
@@ -717,14 +718,14 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         </button>
         <button
           type="button"
-          :title="privacyPalette === 'light' ? '切换到黑夜（F12）' : '切换到白色（F12）'"
-          :aria-label="privacyPalette === 'light' ? '切换到黑夜' : '切换到白色'"
+          :title="privacyPalette === 'light' ? t('reader.theme.toggleDarkShortcut') : t('reader.theme.toggleLightShortcut')"
+          :aria-label="privacyPalette === 'light' ? t('reader.theme.toggleDark') : t('reader.theme.toggleLight')"
           @click="togglePrivacyPalette"
         >
           <Moon v-if="privacyPalette === 'light'" :size="14" />
           <Sun v-else :size="14" />
         </button>
-        <button type="button" title="退出隐私模式（Esc）" aria-label="退出隐私模式" @click="leavePrivacyMode">
+        <button type="button" :title="t('app.privacyMode.exitShortcut')" :aria-label="t('app.privacyMode.exit')" @click="leavePrivacyMode">
           <LogOut :size="14" />
         </button>
       </div>
@@ -732,7 +733,7 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
 
     <template v-else>
       <header class="desktop-reader-toolbar">
-        <button type="button" class="icon-button" :title="route.query.from === 'online' ? '返回搜索结果' : '返回目录'" :aria-label="route.query.from === 'online' ? '返回搜索结果' : '返回目录'" @click="returnFromReader"><ArrowLeft :size="18" /></button>
+        <button type="button" class="icon-button" :title="route.query.from === 'online' ? t('search.back') : t('contents.back')" :aria-label="route.query.from === 'online' ? t('search.back') : t('contents.back')" @click="returnFromReader"><ArrowLeft :size="18" /></button>
         <div v-if="book && chapter" class="reader-chapter-heading">
           <strong :title="chapterHeading()">{{ chapterHeading() }}</strong>
           <span :title="chapterMetadata">{{ chapterMetadata }}</span>
@@ -747,8 +748,8 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
         @privacy="enterPrivacyMode()"
         @catalogue="catalogue?.show()"
       />
-      <div v-if="loading" class="view-status" role="status">正在加载章节...</div>
-      <div v-else-if="loadError" class="view-status" role="alert"><p>{{ loadError }}</p><button class="secondary-command" @click="load">重试加载</button><button class="text-command" @click="router.push(`/book/${bookId}`)">返回目录</button></div>
+      <div v-if="loading" class="view-status" role="status">{{ t('contents.loading') }}</div>
+      <div v-else-if="loadError" class="view-status" role="alert"><p>{{ loadError }}</p><button class="secondary-command" @click="load">{{ t('common.retryLoad') }}</button><button class="text-command" @click="router.push(`/book/${bookId}`)">{{ t('contents.back') }}</button></div>
       <main v-else-if="book && chapter" class="desktop-reader-content">
         <article :class="{ 'reader-custom-font': font !== 'original' }">
           <p v-if="chapter.kind !== 'volume'" class="reader-volume">{{ chapter.volume || book.title }}</p>
@@ -756,10 +757,10 @@ watch(() => [route.params.bookId, route.params.chapterNumber], load)
           <div v-if="isRichContent" class="epub-content" v-html="formattedRichContent" />
           <template v-else><p v-for="(paragraph, index) in paragraphs" :key="index" class="reader-body-paragraph">{{ paragraph }}</p></template>
         </article>
-        <nav class="reader-chapter-nav" aria-label="章节导航">
-          <button type="button" :disabled="!previous || loading" :title="previous?.title || '已经是第一章'" @click="previous && openChapter(previous.number)"><ChevronLeft :size="18" /><span>上一章</span></button>
-          <button type="button" aria-haspopup="dialog" @click="catalogue?.show()">目录</button>
-          <button type="button" :disabled="!next || loading" :title="next?.title || '已经是最后一章'" @click="next && openChapter(next.number)"><span>下一章</span><ChevronRight :size="18" /></button>
+        <nav class="reader-chapter-nav" :aria-label="t('contents.navigation')">
+          <button type="button" :disabled="!previous || loading" :title="previous?.title || t('reader.firstChapter')" @click="previous && openChapter(previous.number)"><ChevronLeft :size="18" /><span>{{ t('reader.prevChapter') }}</span></button>
+          <button type="button" aria-haspopup="dialog" @click="catalogue?.show()">{{ t('contents.title') }}</button>
+          <button type="button" :disabled="!next || loading" :title="next?.title || t('reader.lastChapter')" @click="next && openChapter(next.number)"><span>{{ t('reader.nextChapter') }}</span><ChevronRight :size="18" /></button>
         </nav>
       </main>
       <ReaderCatalogueDialog ref="catalogue" :chapters="chapters" :current="chapterNumber" @select="openChapter" />

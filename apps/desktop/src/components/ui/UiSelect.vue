@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, ChevronDown } from 'lucide-vue-next'
 
@@ -63,7 +64,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
       @click="open = !open"
       @keydown="onKeydown"
     >
-      <span>{{ selected?.label || '请选择' }}</span>
+      <span>{{ selected?.label || t('common.placeholder') }}</span>
       <ChevronDown :size="15" aria-hidden="true" />
     </button>
     <Transition name="ui-select-popup">

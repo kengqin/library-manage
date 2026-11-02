@@ -1,3 +1,5 @@
+import type { MessageKey } from '@novel-library/i18n'
+import { t } from '@novel-library/i18n/vue'
 import { httpUrl, type FetchPage } from './online-parser'
 
 export type SearchEngine = 'bing' | 'baidu' | 'google' | 'sogou' | 'so360' | 'duckduckgo' | 'brave'
@@ -39,7 +41,17 @@ export async function loadSearchBatch(fetchPage: (cursor?: string) => Promise<Se
   }
   return { hits, pending, next, warning }
 }
-export const searchEngineOptions = [{ value: 'bing', label: '必应' }, { value: 'baidu', label: '百度' }, { value: 'google', label: 'Google' }, { value: 'sogou', label: '搜狗' }, { value: 'so360', label: '360 搜索' }, { value: 'duckduckgo', label: 'DuckDuckGo' }, { value: 'brave', label: 'Brave Search' }]
+export interface SearchEngineOption { value: SearchEngine; label: MessageKey }
+/** 引擎名称走字典，切换语言后由调用方用 t(label) 取当前语言下的名字 */
+export const searchEngineOptions: SearchEngineOption[] = [
+  { value: 'bing', label: 'search.engine.bing' },
+  { value: 'baidu', label: 'search.engine.baidu' },
+  { value: 'google', label: 'search.engine.google' },
+  { value: 'sogou', label: 'search.engine.sogou' },
+  { value: 'so360', label: 'search.engine.so360' },
+  { value: 'duckduckgo', label: 'search.engine.duckduckgo' },
+  { value: 'brave', label: 'search.engine.brave' }
+]
 const clean = (value: string | null | undefined) => (value || '').replace(/\s+/gu, ' ').trim()
 
 export function searchBrowserUrl(engine: string, query: string) {
@@ -85,9 +97,10 @@ export function parseSearchPage(html: string, url: string, engine: SearchEngine,
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const text = doc.body.textContent || ''
   if (/安全验证|人机验证|Just a moment|Access denied|验证访问|Robot Check/iu.test(doc.title) || doc.querySelector('#challenge-form,form[action*="anomaly.js"],form[action*="/sorry"],.g-recaptcha') || /unusual traffic from your computer|我们的系统检测到|此验证码用于确认/iu.test(text)) {
-    throw new Error(`${searchEngineOptions.find(option => option.value === engine)?.label}要求网页验证，请切换搜索引擎，或在浏览器中打开搜索。`)
+    const engineName = t(searchEngineOptions.find(option => option.value === engine)?.label ?? 'search.engine')
+    throw new Error(t('error.searchVerification', { engine: engineName }))
   }
-  if (engine === 'google' && !doc.querySelector('h3') && /Please click here if you are not redirected|enablejs/iu.test(text + html.slice(0, 3000))) throw new Error('Google要求浏览器加载页面，请稍后重试。')
+  if (engine === 'google' && !doc.querySelector('h3') && /Please click here if you are not redirected|enablejs/iu.test(text + html.slice(0, 3000))) throw new Error(t('error.googleNeedsBrowser'))
   const selectors: Record<string, string> = {
     bing: '.b_algo h2 a[href]', baidu: '.result h3 a[href],.c-container h3 a[href]',
     google: 'a[href]:has(h3)',

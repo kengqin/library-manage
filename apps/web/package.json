@@ -11,6 +11,7 @@
     "publish": "npm run build && gh-pages -d .vitepress/dist -b gh-pages --dotfiles"
   },
   "dependencies": {
+    "@novel-library/i18n": "0.1.0",
     "@novel-library/novel-parser": "0.1.0",
     "@novel-library/reader-core": "0.1.0",
     "@novel-library/storage-web": "0.1.0",

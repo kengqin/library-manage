@@ -1,0 +1,14 @@
+{
+  "name": "@novel-library/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vue": "./src/vue.ts"
+  },
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  }
+}

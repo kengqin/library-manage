@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Copy, Minus, Square, X } from 'lucide-vue-next'
 import { isTauri } from '@tauri-apps/api/core'
@@ -70,12 +71,12 @@ onBeforeUnmount(() => unlistenResize?.())
         <strong>library-manage</strong>
       </div>
       <div class="window-controls">
-        <button type="button" title="最小化" aria-label="最小化" @dblclick.stop @click.stop="minimizeWindow"><Minus :size="16" /></button>
-        <button type="button" :title="maximized ? '还原' : '最大化'" :aria-label="maximized ? '还原' : '最大化'" @dblclick.stop @click.stop="toggleMaximizeWindow">
+        <button type="button" :title="t('window.minimize')" :aria-label="t('window.minimize')" @dblclick.stop @click.stop="minimizeWindow"><Minus :size="16" /></button>
+        <button type="button" :title="maximized ? t('window.restore') : t('window.maximize')" :aria-label="maximized ? t('window.restore') : t('window.maximize')" @dblclick.stop @click.stop="toggleMaximizeWindow">
           <Copy v-if="maximized" :size="13" />
           <Square v-else :size="12" />
         </button>
-        <button type="button" class="window-control-close" title="关闭" aria-label="关闭" @dblclick.stop @click.stop="closeWindow"><X :size="17" /></button>
+        <button type="button" class="window-control-close" :title="t('common.close')" :aria-label="t('common.close')" @dblclick.stop @click.stop="closeWindow"><X :size="17" /></button>
       </div>
     </div>
 

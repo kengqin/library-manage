@@ -1,3 +1,4 @@
+import { t } from '@novel-library/i18n/vue'
 import { reactive, shallowRef } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { discoverCatalog, type DiscoveryProgress, type OnlineCatalog } from './online-parser'
@@ -42,7 +43,7 @@ export function beginOnlineDiscovery(url: string): OnlineDiscovery {
     },
     adopt: () => {
       if (adoption) return adoption
-      if (!state.catalog?.chapters.length) return Promise.reject(new Error('正在识别首批章节，请稍候'))
+      if (!state.catalog?.chapters.length) return Promise.reject(new Error(t('import.detectingChapters')))
       adoption = (async () => {
         const snapshot = { ...state.catalog!, chapters: [...state.catalog!.chapters] }
         const id = await addOnlineBook(snapshot)
@@ -58,7 +59,7 @@ export function beginOnlineDiscovery(url: string): OnlineDiscovery {
   job.done = (async () => {
     try {
       const result = await discoverCatalog(url, link => fetchOnlinePage(link, controller.signal), progress => { state.progress = progress }, async catalog => {
-        if (controller.signal.aborted) throw new DOMException('解析已取消', 'AbortError')
+        if (controller.signal.aborted) throw new DOMException(t('parse.cancelled'), 'AbortError')
         state.catalog = withMetadata(catalog)
         if (state.bookId) await persist(state.catalog)
       })
@@ -67,7 +68,7 @@ export function beginOnlineDiscovery(url: string): OnlineDiscovery {
       if (state.bookId) await persist(state.catalog)
     } catch (cause) {
       state.error = state.cancelled ? '' : cause instanceof Error ? cause.message : String(cause)
-      if (state.bookId) await invoke('set_online_state', { bookId: state.bookId, error: state.cancelled ? '目录解析已取消，可在下载管理中检查更新以继续。' : state.error }).catch(() => {})
+      if (state.bookId) await invoke('set_online_state', { bookId: state.bookId, error: state.cancelled ? t('online.contents.cancelledDetail') : state.error }).catch(() => {})
     } finally {
       state.finished = true
       if (state.bookId) adoptedJobs.delete(state.bookId)
@@ -87,13 +88,13 @@ export function ensureCatalogComplete(bookId: string): Promise<void> {
       const book = onlineBooks.value.find(book => book.bookId === bookId)
       if (!book || book.catalogComplete !== false) return
       const catalog = await discoverCatalog(book.catalogUrl, url => fetchOnlinePage(url, controller.signal))
-      if (controller.signal.aborted) throw new DOMException('目录解析已取消', 'AbortError')
+      if (controller.signal.aborted) throw new DOMException(t('online.contents.cancelled'), 'AbortError')
       catalog.catalogUrl = book.catalogUrl
       await addOnlineBook({ ...catalog, complete: true }, { reveal: false })
       window.dispatchEvent(new CustomEvent('online-catalog-updated', { detail: { bookId } }))
     }
     await refreshOnlineBooks()
-    if (onlineBooks.value.find(book => book.bookId === bookId)?.catalogComplete === false) throw new Error('目录尚未完整，请在下载管理中重试检查更新')
+    if (onlineBooks.value.find(book => book.bookId === bookId)?.catalogComplete === false) throw new Error(t('online.contents.incompleteRetry'))
   })().finally(() => recovering.delete(bookId))
   recovering.set(bookId, { controller, done: work })
   return work

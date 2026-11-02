@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { t, useI18n } from '@novel-library/i18n/vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isTauri } from '@tauri-apps/api/core'
 import { emitTo, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useRoute } from 'vue-router'
@@ -36,30 +37,41 @@ watch(() => route.path, path => { if (props.windowed && path.endsWith('/updates'
 let unlistenSection: UnlistenFn | undefined
 const notifyDataChange = () => props.windowed && isTauri() ? emitTo('main', 'settings-data-changed') : Promise.resolve()
 
-const appearanceOptions: UiSelectOption[] = [
-  { value: 'system', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' }
-]
+const { locale, locales, setLocale } = useI18n()
 
-const closeBehaviorOptions: UiSelectOption[] = [
-  { value: 'ask', label: '每次询问' },
-  { value: 'minimizeToTray', label: '缩小到托盘' },
-  { value: 'quit', label: '直接退出' }
-]
+// 选项文案要跟随语言切换，必须用 computed，不能是 setup 期算好的常量
+const appearanceOptions = computed<UiSelectOption[]>(() => [
+  { value: 'system', label: t('app.appearance.system') },
+  { value: 'light', label: t('app.appearance.light') },
+  { value: 'dark', label: t('app.appearance.dark') }
+])
+
+const closeBehaviorOptions = computed<UiSelectOption[]>(() => [
+  { value: 'ask', label: t('window.closeBehavior.ask') },
+  { value: 'minimizeToTray', label: t('window.closeBehavior.tray') },
+  { value: 'quit', label: t('window.closeBehavior.quit') }
+])
+
+const languageOptions = computed<UiSelectOption[]>(() => locales.map(option => ({ value: option.value, label: option.label })))
+
+function updateLocale(value: string) {
+  const next = setLocale(value)
+  const label = locales.find(option => option.value === next)?.label || next
+  showGlobalMessage(t('settings.language.changed', { language: label }))
+}
 
 function queueSettingAction(action: PendingSettingAction) {
   pendingSettingAction.value = action
 }
 
-function showError(cause: unknown, fallback = '设置修改失败，请稍后重试') {
+function showError(cause: unknown, fallback = t('app.settings.saveFailed')) {
   showGlobalError(cause, fallback)
 }
 
 function updateAppearance(value: 'system' | 'light' | 'dark') {
   setAppearance(value)
-  const label = appearanceOptions.find(option => option.value === value)?.label || '所选外观'
-  showGlobalMessage(`外观已切换为“${label}”`)
+  const label = appearanceOptions.value.find(option => option.value === value)?.label || t('app.appearance.selected')
+  showGlobalMessage(t('app.appearance.switched', { label }))
 }
 
 async function confirmSettingAction() {
@@ -81,22 +93,22 @@ async function refreshStatus() {
   try {
     status.value = await getDesktopStorageStatus()
   } catch (cause) {
-    showError(cause, '无法读取本地数据库状态')
+    showError(cause, t('storage.database.statusFailed'))
   }
 }
 
 async function exportBackup() {
   const target = await save({
     defaultPath: `NovelLibrary-backup-${new Date().toISOString().slice(0, 10)}.json`,
-    filters: [{ name: 'library-manage 备份', extensions: ['json'] }]
+    filters: [{ name: t('storage.backup.fileName'), extensions: ['json'] }]
   })
   if (!target) return
   busy.value = true
   try {
     const result = await exportDesktopBackup(target)
-    showGlobalMessage(`备份已导出：${result.books} 本书、${result.chapters} 章、${result.notes} 篇笔记`)
+    showGlobalMessage(t('storage.backup.exportedSummary', { books: result.books, chapters: result.chapters, notes: result.notes }))
   } catch (cause) {
-    showError(cause, '备份导出失败，请稍后重试')
+    showError(cause, t('storage.backup.exportFailed'))
   } finally {
     busy.value = false
   }
@@ -105,61 +117,61 @@ async function exportBackup() {
 async function importBackup() {
   const source = await open({
     multiple: false,
-    filters: [{ name: 'library-manage 备份', extensions: ['json'] }]
+    filters: [{ name: t('storage.backup.fileName'), extensions: ['json'] }]
   })
   if (!source || Array.isArray(source)) return
   busy.value = true
   try {
     const result = await importDesktopBackup(source)
     await notifyDataChange()
-    showGlobalMessage(`备份已恢复：${result.books} 本书、${result.chapters} 章、${result.notes} 篇笔记`)
+    showGlobalMessage(t('storage.backup.restoredSummary', { books: result.books, chapters: result.chapters, notes: result.notes }))
   } catch (cause) {
-    showError(cause, '备份恢复失败，请检查文件后重试')
+    showError(cause, t('storage.backup.restoreFailed'))
   } finally {
     busy.value = false
   }
 }
 
 async function chooseDataDirectory() {
-  const directory = await open({ directory: true, multiple: false, title: '选择 library-manage 数据目录', defaultPath: status.value?.dataDirectory })
+  const directory = await open({ directory: true, multiple: false, title: t('storage.folder.pick'), defaultPath: status.value?.dataDirectory })
   if (!directory || Array.isArray(directory)) return
   queueSettingAction({
-    title: '切换数据目录？',
-    description: '当前书库会复制到新目录，原数据库会保留。复制完成前请不要关闭应用。',
-    confirmLabel: '切换目录',
+    title: t('storage.folder.switchConfirm'),
+    description: t('storage.folder.switchHint'),
+    confirmLabel: t('storage.folder.switch'),
     run: async () => {
       status.value = await changeDesktopDataDirectory(directory)
-      showGlobalMessage('数据目录已切换')
+      showGlobalMessage(t('storage.folder.switched'))
     }
   })
 }
 
 async function resetDataDirectory() {
   queueSettingAction({
-    title: '恢复默认数据目录？',
-    description: '当前书库会复制回应用默认数据目录，现有数据库文件不会立即删除。',
-    confirmLabel: '恢复默认目录',
+    title: t('storage.folder.resetConfirm'),
+    description: t('storage.folder.resetHint'),
+    confirmLabel: t('storage.folder.reset'),
     run: async () => {
       status.value = await resetDesktopDataDirectory()
-      showGlobalMessage('已恢复默认数据目录')
+      showGlobalMessage(t('storage.folder.resetDone'))
     }
   })
 }
 
 async function chooseDatabaseFile() {
   const databasePath = await save({
-    title: '选择或新建 library-manage 数据库文件',
+    title: t('storage.database.pick'),
     defaultPath: status.value?.databasePath || 'library.db',
-    filters: [{ name: 'SQLite 数据库', extensions: ['db', 'sqlite', 'sqlite3'] }]
+    filters: [{ name: t('storage.database.sqlite'), extensions: ['db', 'sqlite', 'sqlite3'] }]
   })
   if (!databasePath) return
   queueSettingAction({
-    title: '切换数据库文件？',
-    description: '当前书库会复制到新文件；如果目标是已有数据库，应用会先校验再切换。',
-    confirmLabel: '切换数据库',
+    title: t('storage.database.switchConfirm'),
+    description: t('storage.database.switchHint'),
+    confirmLabel: t('storage.database.switch'),
     run: async () => {
       status.value = await changeDesktopDatabaseFile(databasePath)
-      showGlobalMessage('数据库文件已切换')
+      showGlobalMessage(t('storage.database.switched'))
     }
   })
 }
@@ -168,9 +180,9 @@ async function saveCloseBehavior() {
   busy.value = true
   try {
     closeBehavior.value = await setCloseBehavior(closeBehavior.value)
-    showGlobalMessage('关闭窗口方式已保存')
+    showGlobalMessage(t('window.closeBehavior.saved'))
   } catch (cause) {
-    showError(cause, '关闭窗口方式保存失败，请稍后重试')
+    showError(cause, t('window.closeBehavior.saveFailed'))
   } finally {
     busy.value = false
   }
@@ -180,8 +192,8 @@ onMounted(async () => {
   if (props.windowed && isTauri()) unlistenSection = await listen<string>('settings-section', event => { activeSection.value = selectedSection(event.payload) })
   await Promise.all([
     refreshStatus(),
-    getCurrentVersion().then(version => { currentVersion.value = version }).catch(cause => showError(cause, '无法读取当前版本')),
-    getCloseBehavior().then(behavior => { closeBehavior.value = behavior }).catch(cause => showError(cause, '无法读取关闭窗口方式'))
+    getCurrentVersion().then(version => { currentVersion.value = version }).catch(cause => showError(cause, t('update.readCurrentFailed'))),
+    getCloseBehavior().then(behavior => { closeBehavior.value = behavior }).catch(cause => showError(cause, t('window.closeBehavior.readFailed')))
   ])
 })
 onBeforeUnmount(() => unlistenSection?.())
@@ -189,67 +201,73 @@ onBeforeUnmount(() => unlistenSection?.())
 
 <template>
   <section class="workspace-view settings-view" :class="{ 'settings-view--windowed': windowed }">
-    <PageHeader v-if="!windowed" title="设置" />
-    <nav class="settings-tabs" aria-label="设置分类">
-      <button type="button" :class="{ active: activeSection === 'general' }" @click="activeSection = 'general'"><Settings v-if="windowed" :size="17" />常规</button>
-      <button type="button" :class="{ active: activeSection === 'storage' }" @click="activeSection = 'storage'"><Database v-if="windowed" :size="17" />{{ windowed ? '数据存储' : '数据' }}</button>
-      <button type="button" :class="{ active: activeSection === 'updates' }" @click="activeSection = 'updates'"><Download v-if="windowed" :size="17" />{{ windowed ? '版本与更新' : '更新' }}</button>
+    <PageHeader v-if="!windowed" :title="t('app.settings.title')" />
+    <nav class="settings-tabs" :aria-label="t('app.settings.categories')">
+      <button type="button" :class="{ active: activeSection === 'general' }" @click="activeSection = 'general'"><Settings v-if="windowed" :size="17" /><span class="settings-tab-label">{{ t('app.settings.general') }}</span></button>
+      <button type="button" :class="{ active: activeSection === 'storage' }" @click="activeSection = 'storage'"><Database v-if="windowed" :size="17" /><span class="settings-tab-label">{{ windowed ? t('app.settings.storageTab') : t('app.settings.data') }}</span></button>
+      <button type="button" :class="{ active: activeSection === 'updates' }" @click="activeSection = 'updates'"><Download v-if="windowed" :size="17" /><span class="settings-tab-label">{{ windowed ? t('app.settings.updatesTab') : t('common.update') }}</span></button>
     </nav>
 
     <div v-if="activeSection === 'general'" class="settings-section">
-      <p class="settings-group-label">应用</p>
+      <p class="settings-group-label">{{ t('settings.group.application') }}</p>
       <div class="settings-panel">
         <section class="setting-row">
-          <div class="setting-copy"><strong>应用外观</strong><span>选择浅色、深色或跟随系统外观</span></div>
-          <UiSelect :model-value="appearance" :options="appearanceOptions" label="应用外观" @update:model-value="updateAppearance($event as 'system' | 'light' | 'dark')" />
+          <div class="setting-copy"><strong>{{ t('app.appearance.title') }}</strong><span>{{ t('app.appearance.description') }}</span></div>
+          <UiSelect :model-value="appearance" :options="appearanceOptions" :label="t('app.appearance.title')" @update:model-value="updateAppearance($event as 'system' | 'light' | 'dark')" />
         </section>
         <section class="setting-row">
-          <div class="setting-copy"><strong>关闭窗口时</strong><span>设置关闭主窗口时应用采取的操作</span></div>
-          <UiSelect v-model="closeBehavior" :options="closeBehaviorOptions" label="关闭窗口行为" :disabled="busy" @change="saveCloseBehavior" />
+          <div class="setting-copy"><strong>{{ t('settings.language') }}</strong><span>{{ t('settings.language.description') }}</span></div>
+          <UiSelect :model-value="locale" :options="languageOptions" :label="t('settings.language')" @update:model-value="updateLocale(String($event))" />
+        </section>
+        <section class="setting-row">
+          <div class="setting-copy"><strong>{{ t('window.closeBehavior') }}</strong><span>{{ t('window.closeBehavior.description') }}</span></div>
+          <UiSelect v-model="closeBehavior" :options="closeBehaviorOptions" :label="t('window.closeBehavior.label')" :disabled="busy" @change="saveCloseBehavior" />
         </section>
         <section class="setting-row setting-row-status">
-          <div class="setting-copy"><strong>本地数据库</strong><span>{{ status?.databaseReady ? '已准备就绪' : '等待初始化' }}</span></div>
-          <span class="setting-state" :class="{ ready: status?.databaseReady }">{{ status?.databaseReady ? '正常' : '准备中' }}</span>
+          <div class="setting-copy"><strong>{{ t('storage.database.local') }}</strong><span>{{ status?.databaseReady ? t('common.ready') : t('common.waitingInit') }}</span></div>
+          <span class="setting-state" :class="{ ready: status?.databaseReady }">{{ status?.databaseReady ? t('common.ok') : t('common.preparing') }}</span>
         </section>
       </div>
     </div>
 
     <div v-else-if="activeSection === 'storage'" class="settings-section">
-      <p class="settings-group-label">本地数据</p>
+      <p class="settings-group-label">{{ t('storage.local.data') }}</p>
       <div class="settings-panel">
         <section class="setting-row setting-row-wide data-directory-setting">
-          <div class="setting-copy"><strong>数据目录</strong><span :title="status?.dataDirectory">{{ status?.dataDirectory || '尚未创建' }}</span></div>
-          <div class="header-actions"><button type="button" class="secondary-command" :disabled="busy" @click="resetDataDirectory">默认</button><button type="button" class="primary-command" :disabled="busy" @click="chooseDataDirectory">更改</button></div>
+          <div class="setting-copy"><strong>{{ t('storage.folder') }}</strong><span :title="status?.dataDirectory">{{ status?.dataDirectory || t('library.progress.none') }}</span></div>
+          <div class="header-actions"><button type="button" class="secondary-command" :disabled="busy" @click="resetDataDirectory">{{ t('common.default') }}</button><button type="button" class="primary-command" :disabled="busy" @click="chooseDataDirectory">{{ t('common.change') }}</button></div>
         </section>
         <section class="setting-row setting-row-wide database-file-setting">
-          <div class="setting-copy"><strong>数据库文件</strong><span :title="status?.databasePath">{{ status?.databasePath || '尚未创建' }}</span></div>
-          <button type="button" class="primary-command" :disabled="busy" @click="chooseDatabaseFile">更改</button>
+          <div class="setting-copy"><strong>{{ t('storage.database.file') }}</strong><span :title="status?.databasePath">{{ status?.databasePath || t('library.progress.none') }}</span></div>
+          <button type="button" class="primary-command" :disabled="busy" @click="chooseDatabaseFile">{{ t('common.change') }}</button>
         </section>
         <section class="setting-row setting-row-wide backup-setting">
-          <div class="setting-copy"><strong>完整数据备份</strong><span>书籍、章节、阅读进度和笔记</span></div>
-          <div class="header-actions"><button type="button" class="secondary-command" :disabled="busy" @click="importBackup">恢复</button><button type="button" class="primary-command" :disabled="busy" @click="exportBackup">导出</button></div>
+          <div class="setting-copy"><strong>{{ t('storage.backup.fullData') }}</strong><span>{{ t('storage.backup.contents') }}</span></div>
+          <div class="header-actions"><button type="button" class="secondary-command" :disabled="busy" @click="importBackup">{{ t('storage.backup.restoreShort') }}</button><button type="button" class="primary-command" :disabled="busy" @click="exportBackup">{{ t('common.export') }}</button></div>
         </section>
       </div>
     </div>
 
     <UpdatesView v-else-if="windowed" embedded class="settings-window-updates" />
     <div v-else class="settings-section">
-      <p class="settings-group-label">版本</p>
+      <p class="settings-group-label">{{ t('update.version') }}</p>
       <div class="settings-panel settings-update-panel">
         <section class="setting-row setting-row-wide">
-          <div class="setting-copy"><strong>版本与更新</strong><span v-if="availableUpdate">可更新至 v{{ availableUpdate.version }}</span><span v-else-if="publishedUpdateVersion">v{{ publishedUpdateVersion }} 已发布</span><span v-else>当前 v{{ currentVersion || '...' }}</span></div>
-          <RouterLink to="/settings/updates" class="primary-command">打开更新<ArrowRight :size="15" /></RouterLink>
+          <div class="setting-copy"><strong>{{ t('app.settings.updatesTab') }}</strong><span v-if="availableUpdate">{{ t('update.available', { version: availableUpdate.version }) }}</span><span v-else-if="publishedUpdateVersion">{{ t('update.releasedShort', { version: publishedUpdateVersion }) }}</span><span v-else>{{ t('update.currentVersion', { version: currentVersion || '...' }) }}</span></div>
+          <RouterLink to="/settings/updates" class="primary-command">{{ t('update.open') }}<ArrowRight :size="15" /></RouterLink>
         </section>
       </div>
     </div>
-    <UiConfirmDialog :open="Boolean(pendingSettingAction)" :busy="busy" :title="pendingSettingAction?.title || '确认更改设置？'" :description="pendingSettingAction?.description || ''" :confirm-label="pendingSettingAction?.confirmLabel || '确认'" @close="pendingSettingAction = null" @confirm="confirmSettingAction" />
+    <UiConfirmDialog :open="Boolean(pendingSettingAction)" :busy="busy" :title="pendingSettingAction?.title || t('settings.confirmChange')" :description="pendingSettingAction?.description || ''" :confirm-label="pendingSettingAction?.confirmLabel || t('common.confirm')" @close="pendingSettingAction = null" @confirm="confirmSettingAction" />
   </section>
 </template>
 
 <style scoped>
-.settings-view--windowed { display: grid; grid-template-columns: 160px minmax(0,1fr); gap: 0; width: 100%; max-width: none; height: 100%; min-height: 0; padding: 0; margin: 0; }
+.settings-view--windowed { display: grid; grid-template-columns: 202px minmax(0,1fr); gap: 0; width: 100%; max-width: none; height: 100%; min-height: 0; padding: 0; margin: 0; }
 .settings-view--windowed .settings-tabs { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; width: 100%; gap: 3px; padding: 24px 9px; margin: 0; border: 0; border-right: 1px solid var(--ui-border); border-radius: 0; background: var(--ui-surface-2); }
 .settings-view--windowed .settings-tabs > button { display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 0 15px; border: 0; border-radius: 6px; text-align: left; font-size: 13px; color: var(--ui-text-2); background: transparent; }
+/* 选中态字重变粗会让标签变宽，这里禁止折行，超长时省略而不是挤成两行 */
+.settings-view--windowed .settings-tab-label { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .settings-view--windowed .settings-tabs > button.active { color: var(--ui-text); background: var(--ui-selected); font-weight: 500; }
 .settings-view--windowed .settings-tabs > button:hover { background: var(--ui-hover); }
 .settings-view--windowed > .settings-section,.settings-view--windowed > .settings-window-updates { grid-column: 2; grid-row: 1; overflow: auto; min-height: 0; padding: 27px 32px; margin: 0; }

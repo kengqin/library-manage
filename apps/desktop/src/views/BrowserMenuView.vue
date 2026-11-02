@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { Check, ChevronRight, Copy, ExternalLink, RefreshCw, Type } from 'lucide-vue-next'
@@ -22,17 +23,17 @@ const keys = (event: KeyboardEvent) => { if (event.key === 'Escape') void closeB
 onMounted(() => { void initializeWebBrowser().then(() => invoke('web_browser_menu_ready')).catch(cause => { error.value = String(cause) }); window.addEventListener('keydown', keys); document.addEventListener('pointerdown', outside, true) })
 onBeforeUnmount(() => { window.removeEventListener('keydown', keys); document.removeEventListener('pointerdown', outside, true); clearTimeout(zoomTimer) })
 </script>
-<template><div class="browser-menu-shell" @pointerleave="!keyboardZoom && closeZoom()" @pointermove="trackPointer"><div class="browser-menu" role="menu" aria-label="网页操作">
-  <button type="button" role="menuitem" @click="run(() => webBrowserAction('reload'))"><RefreshCw :size="14" /><span>刷新</span><kbd>Ctrl+R</kbd></button>
-  <button type="button" role="menuitem" @click="run(copyBrowserLink)"><Copy :size="14" /><span>复制链接</span></button>
-  <button type="button" role="menuitem" data-zoom-trigger aria-haspopup="menu" :aria-expanded="zoomOpen" @pointerenter="openZoom()" @keydown.right.prevent="openZoom(true)" @keydown.left.prevent="closeZoom"><Type :size="14" /><span>调整文字大小</span><kbd>{{ Math.round((webBrowser.zoomFactor || 1) * 100) }}%</kbd><ChevronRight :size="12" /></button>
-  <div v-if="zoomOpen" class="browser-zoom-menu" role="menu" aria-label="调整文字大小">
-    <button type="button" role="menuitem" @click="run(() => zoomWebPage('reset'))"><span>标准大小</span><Check v-if="Math.abs((webBrowser.zoomFactor || 1) - 1) < .01" :size="13" /></button>
-    <button type="button" role="menuitem" :disabled="(webBrowser.zoomFactor || 1) <= .5" @click="run(() => zoomWebPage('out'))">缩小</button>
-    <button type="button" role="menuitem" :disabled="(webBrowser.zoomFactor || 1) >= 2" @click="run(() => zoomWebPage('in'))">放大</button>
+<template><div class="browser-menu-shell" @pointerleave="!keyboardZoom && closeZoom()" @pointermove="trackPointer"><div class="browser-menu" role="menu" :aria-label="t('browser.actions')">
+  <button type="button" role="menuitem" @click="run(() => webBrowserAction('reload'))"><RefreshCw :size="14" /><span>{{ t('common.refresh') }}</span><kbd>Ctrl+R</kbd></button>
+  <button type="button" role="menuitem" @click="run(copyBrowserLink)"><Copy :size="14" /><span>{{ t('common.copyLink') }}</span></button>
+  <button type="button" role="menuitem" data-zoom-trigger aria-haspopup="menu" :aria-expanded="zoomOpen" @pointerenter="openZoom()" @keydown.right.prevent="openZoom(true)" @keydown.left.prevent="closeZoom"><Type :size="14" /><span>{{ t('reader.textSize') }}</span><kbd>{{ Math.round((webBrowser.zoomFactor || 1) * 100) }}%</kbd><ChevronRight :size="12" /></button>
+  <div v-if="zoomOpen" class="browser-zoom-menu" role="menu" :aria-label="t('reader.textSize')">
+    <button type="button" role="menuitem" @click="run(() => zoomWebPage('reset'))"><span>{{ t('library.size.standard') }}</span><Check v-if="Math.abs((webBrowser.zoomFactor || 1) - 1) < .01" :size="13" /></button>
+    <button type="button" role="menuitem" :disabled="(webBrowser.zoomFactor || 1) <= .5" @click="run(() => zoomWebPage('out'))">{{ t('common.zoomOut') }}</button>
+    <button type="button" role="menuitem" :disabled="(webBrowser.zoomFactor || 1) >= 2" @click="run(() => zoomWebPage('in'))">{{ t('common.zoomIn') }}</button>
   </div>
   <hr />
-  <button type="button" role="menuitem" @click="run(() => webBrowserAction('external'))"><ExternalLink :size="14" /><span>默认浏览器打开</span></button>
+  <button type="button" role="menuitem" @click="run(() => webBrowserAction('external'))"><ExternalLink :size="14" /><span>{{ t('online.openInBrowser') }}</span></button>
   <small v-if="error" role="alert">{{ error }}</small>
 </div></div></template>
 <style scoped>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -22,5 +23,5 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => { unlisten?.(); unlistenState?.() })
 </script>
-<template><section class="software-update-window" role="dialog" aria-label="软件更新"><header data-tauri-drag-region><span data-tauri-drag-region>软件更新</span><button type="button" aria-label="关闭" @click="close"><X :size="16" /></button></header><GlobalUpdateStatus windowed :current-version="currentVersion" @close="close" /></section></template>
+<template><section class="software-update-window" role="dialog" :aria-label="t('update.software')"><header data-tauri-drag-region><span data-tauri-drag-region>{{ t('update.software') }}</span><button type="button" :aria-label="t('common.close')" @click="close"><X :size="16" /></button></header><GlobalUpdateStatus windowed :current-version="currentVersion" @close="close" /></section></template>
 <style scoped>.software-update-window { height: 100vh; display: grid; grid-template-rows: 32px minmax(0, 1fr); background: var(--ui-surface); }.software-update-window > header { position: relative; display: grid; place-items: center; color: var(--ui-text-2); font-size: 12px; }.software-update-window > header button { position: absolute; top: 2px; right: 6px; display: grid; place-items: center; width: 30px; height: 28px; padding: 0; color: var(--ui-text-2); border: 0; border-radius: 5px; background: transparent; }.software-update-window > header button:hover { color: var(--ui-text); background: var(--ui-hover); }</style>

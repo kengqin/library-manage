@@ -1,3 +1,4 @@
+import { t } from '@novel-library/i18n/vue'
 import { CapacitorSQLite } from '@capacitor-community/sqlite'
 import { calculateOverallProgress, type LibrarySearchResult, type LocalAsset, type LocalBook, type LocalChapter, type SaveImportedBookInput, type StorageStats, type ThemeSettings } from '@novel-library/reader-core'
 
@@ -45,7 +46,7 @@ export async function saveImportedBook(input: SaveImportedBookInput): Promise<Lo
   const book: LocalBook = {
     id,
     title: input.result.metadata.title,
-    author: input.result.metadata.author || '佚名',
+    author: input.result.metadata.author || t('library.field.anonymous'),
     description: input.result.metadata.description,
     sourceName: input.result.metadata.sourceName,
     sourceSize: input.result.metadata.sourceSize,
@@ -129,14 +130,14 @@ export async function exportLibrary() {
 
 export async function exportBook(bookId: string) {
   const book = await getBook(bookId)
-  if (!book) throw new Error('要导出的书籍不存在')
+  if (!book) throw new Error(t('library.export.notFound'))
   return { format: 'novel-library-book', version: 1, exportedAt: new Date().toISOString(), books: [book], chapters: await getChapters(bookId), assets: (await getAssets()).filter(asset => asset.bookId === bookId) }
 }
 
 export async function importLibraryBackup(payload: unknown) {
   const backup = payload as { format?: string; version?: number; books?: LocalBook[]; chapters?: LocalChapter[]; assets?: Array<LocalAsset & { blob: string }> }
-  if (backup?.version !== 1 || !Array.isArray(backup.books) || !Array.isArray(backup.chapters)) throw new Error('不是有效的本地书架备份')
-  if (backup.format !== undefined && !['novel-library-backup', 'novel-library-book'].includes(backup.format)) throw new Error('不支持的备份格式')
+  if (backup?.version !== 1 || !Array.isArray(backup.books) || !Array.isArray(backup.chapters)) throw new Error(t('storage.backup.invalidShelf'))
+  if (backup.format !== undefined && !['novel-library-backup', 'novel-library-book'].includes(backup.format)) throw new Error(t('storage.backup.unsupported'))
   const bookIds = new Set(backup.books.map(book => book?.id).filter((id): id is string => typeof id === 'string' && Boolean(id)))
   if (bookIds.size !== backup.books.length || backup.chapters.some(chapter => !chapter?.id || !bookIds.has(chapter.bookId))) throw new Error('备份中的书籍或章节关联无效')
   await dbReady()

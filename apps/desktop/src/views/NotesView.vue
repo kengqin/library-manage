@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
@@ -92,7 +93,7 @@ const editor = useEditor({
       heading: { levels: [1, 2, 3] },
       link: { openOnClick: false, autolink: true, defaultProtocol: 'https' }
     }),
-    Placeholder.configure({ placeholder: '输入正文，或使用工具栏开始排版...' })
+    Placeholder.configure({ placeholder: t('notes.editor.placeholder') })
   ],
   editorProps: {
     attributes: {
@@ -116,7 +117,7 @@ async function loadNotes() {
   try {
     notes.value = await listNotes(query.value)
   } catch (cause) {
-    showError(cause, '笔记列表加载失败，请稍后重试')
+    showError(cause, t('notes.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -127,26 +128,26 @@ async function selectNote(noteId: string) {
   await persistCurrentNote()
   try {
     const note = await getNote(noteId)
-    if (!note) throw new Error('笔记不存在或已被删除')
+    if (!note) throw new Error(t('notes.notFound'))
     hydrating = true
     selectedNote.value = note
     title.value = note.title
     contentText.value = note.contentText
     editor.value?.commands.setContent(note.contentHtml || '<p></p>', { emitUpdate: false })
     dirty.value = false
-    saveStatus.value = '已保存'
+    saveStatus.value = t('common.saved')
     await nextTick()
     hydrating = false
   } catch (cause) {
     hydrating = false
-    showError(cause, '笔记打开失败，请稍后重试')
+    showError(cause, t('notes.openFailed'))
   }
 }
 
 function scheduleSave() {
   if (hydrating || !selectedNote.value) return
   dirty.value = true
-  saveStatus.value = '未保存'
+  saveStatus.value = t('common.unsaved')
   window.clearTimeout(saveTimer)
   saveTimer = window.setTimeout(() => {
     void persistCurrentNote()
@@ -168,7 +169,7 @@ async function persistCurrentNote() {
   const snapshotPinned = selectedNote.value.isPinned
   dirty.value = false
   saving.value = true
-  saveStatus.value = '保存中'
+  saveStatus.value = t('common.saving')
   activeSave = (async () => {
     try {
       const saved = await saveNote({
@@ -183,14 +184,14 @@ async function persistCurrentNote() {
         hydrating = true
         title.value = saved.title
         hydrating = false
-        saveStatus.value = '已保存'
+        saveStatus.value = t('common.saved')
       }
       await loadNotes()
       return true
     } catch (cause) {
       dirty.value = true
-      saveStatus.value = '保存失败'
-      showError(cause, '笔记保存失败，请稍后重试')
+      saveStatus.value = t('common.saveFailed')
+      showError(cause, t('notes.saveFailed'))
       return false
     } finally {
       saving.value = false
@@ -210,7 +211,7 @@ async function addNote() {
     await nextTick()
     document.querySelector<HTMLInputElement>('.note-title-input')?.select()
   } catch (cause) {
-    showError(cause, '新建笔记失败，请稍后重试')
+    showError(cause, t('notes.createFailed'))
   }
 }
 
@@ -228,9 +229,9 @@ async function removeCurrentNote() {
     editor.value?.commands.clearContent(false)
     await loadNotes()
     if (notes.value[0]) await selectNote(notes.value[0].id)
-    showGlobalMessage('笔记已删除')
+    showGlobalMessage(t('notes.deleted'))
   } catch (cause) {
-    showError(cause, '笔记删除失败，请稍后重试')
+    showError(cause, t('notes.deleteFailed'))
   }
 }
 
@@ -241,9 +242,9 @@ async function copyCurrentNote() {
     const copy = await duplicateNote(selectedNote.value.id)
     await loadNotes()
     await selectNote(copy.id)
-    showGlobalMessage('笔记副本已创建')
+    showGlobalMessage(t('notes.copied'))
   } catch (cause) {
-    showError(cause, '创建笔记副本失败，请稍后重试')
+    showError(cause, t('notes.copyFailed'))
   }
 }
 
@@ -254,14 +255,14 @@ async function togglePinned() {
     await setNotePinned(selectedNote.value.id, next)
     selectedNote.value = { ...selectedNote.value, isPinned: next }
     await loadNotes()
-    showGlobalMessage(next ? '笔记已置顶' : '已取消置顶')
+    showGlobalMessage(next ? t('notes.pinned') : t('library.pin.cancelled'))
   } catch (cause) {
-    showError(cause, '笔记置顶状态修改失败，请稍后重试')
+    showError(cause, t('notes.pinFailed'))
   }
 }
 
 function safeFileName(value: string) {
-  return value.replace(/[\\/:*?"<>|]/g, '-').trim() || '无标题笔记'
+  return value.replace(/[\\/:*?"<>|]/g, '-').trim() || t('notes.untitled')
 }
 
 function escapeHtml(value: string) {
@@ -291,50 +292,50 @@ async function exportCurrentNote(format: ExportFormat) {
   if (!note) return
   const extension = format === 'markdown' ? 'md' : format
   const targetPath = await save({
-    title: `导出${format === 'markdown' ? ' Markdown' : format.toUpperCase()}`,
+    title: t('library.export.format', { format: format === 'markdown' ? 'Markdown' : format.toUpperCase() }),
     defaultPath: `${safeFileName(note.title)}.${extension}`,
     filters: [{ name: extension.toUpperCase(), extensions: [extension] }]
   })
   if (!targetPath) return
   try {
     await writeNoteExport(targetPath, exportContent(note, format))
-    showGlobalMessage('笔记已导出')
+    showGlobalMessage(t('notes.exported'))
   } catch (cause) {
-    showError(cause, '笔记导出失败，请稍后重试')
+    showError(cause, t('notes.exportFailed'))
   }
 }
 
 async function exportAllNotes() {
   await persistCurrentNote()
   const targetPath = await save({
-    title: '导出全部笔记',
+    title: t('notes.exportAll'),
     defaultPath: `NovelLibrary-notes-${new Date().toISOString().slice(0, 10)}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }]
   })
   if (!targetPath) return
   try {
     const result = await exportNotes(targetPath)
-    showGlobalMessage(`${result.notes} 篇笔记已导出`)
+    showGlobalMessage(t('notes.exportedCount', { count: result.notes }))
   } catch (cause) {
-    showError(cause, '笔记导出失败，请稍后重试')
+    showError(cause, t('notes.exportFailed'))
   }
 }
 
 async function importAllNotes() {
   const sourcePath = await open({
-    title: '导入本地笔记',
+    title: t('notes.import'),
     multiple: false,
     directory: false,
-    filters: [{ name: 'NovelLibrary 笔记', extensions: ['json'] }]
+    filters: [{ name: t('notes.exportTitle'), extensions: ['json'] }]
   })
   if (!sourcePath || Array.isArray(sourcePath)) return
   try {
     const result = await importNotes(sourcePath)
     await loadNotes()
     if (!selectedNote.value && notes.value[0]) await selectNote(notes.value[0].id)
-    showGlobalMessage(`${result.notes} 篇笔记已导入`)
+    showGlobalMessage(t('notes.importedCount', { count: result.notes }))
   } catch (cause) {
-    showError(cause, '笔记导入失败，请检查文件后重试')
+    showError(cause, t('notes.importFailed'))
   }
 }
 
@@ -369,22 +370,22 @@ onMounted(async () => {
 
 <template>
   <section class="notes-workspace">
-    <section class="note-index" aria-label="笔记列表">
+    <section class="note-index" :aria-label="t('notes.title')">
       <header>
-        <div class="note-index-heading"><strong>本地笔记</strong><span>{{ notes.length }}</span></div>
+        <div class="note-index-heading"><strong>{{ t('nav.notes') }}</strong><span>{{ notes.length }}</span></div>
         <div class="note-index-actions">
-          <button type="button" class="icon-button" title="导入笔记 JSON" @click="importAllNotes"><Import :size="15" /></button>
-          <button type="button" class="icon-button" title="导出全部笔记 JSON" @click="exportAllNotes"><FileJson :size="15" /></button>
-          <button type="button" class="icon-button primary-icon" title="新建笔记" @click="addNote"><Plus :size="17" /></button>
+          <button type="button" class="icon-button" :title="t('notes.importJson')" @click="importAllNotes"><Import :size="15" /></button>
+          <button type="button" class="icon-button" :title="t('notes.exportAllJson')" @click="exportAllNotes"><FileJson :size="15" /></button>
+          <button type="button" class="icon-button primary-icon" :title="t('notes.create')" @click="addNote"><Plus :size="17" /></button>
         </div>
       </header>
-      <label class="note-search"><Search :size="15" /><input v-model="query" placeholder="搜索笔记" /><button v-if="query" type="button" title="清空搜索" @click="query = ''"><X :size="14" /></button></label>
-      <div v-if="loading" class="note-list-status">正在读取...</div>
-      <div v-else-if="!notes.length" class="note-list-status">暂无笔记</div>
+      <label class="note-search"><Search :size="15" /><input v-model="query" :placeholder="t('notes.search')" /><button v-if="query" type="button" :title="t('search.clear')" @click="query = ''"><X :size="14" /></button></label>
+      <div v-if="loading" class="note-list-status">{{ t('common.loading') }}</div>
+      <div v-else-if="!notes.length" class="note-list-status">{{ t('notes.empty') }}</div>
       <div v-else class="note-list">
         <button v-for="note in notes" :key="note.id" type="button" :class="{ active: selectedNote?.id === note.id }" @click="selectNote(note.id)">
           <span><strong>{{ note.title }}</strong><Pin v-if="note.isPinned" :size="12" /></span>
-          <p>{{ note.excerpt || '空白笔记' }}</p>
+          <p>{{ note.excerpt || t('notes.blank') }}</p>
           <time>{{ formatDate(note.updatedAt) }}</time>
         </button>
       </div>
@@ -393,57 +394,57 @@ onMounted(async () => {
     <section class="note-editor-pane">
       <div v-if="!selectedNote" class="note-editor-empty">
         <NotebookPen :size="34" />
-        <h2>新建一篇本地笔记</h2>
-        <button type="button" class="primary-command" @click="addNote"><Plus :size="16" />新建笔记</button>
+        <h2>{{ t('notes.createTitle') }}</h2>
+        <button type="button" class="primary-command" @click="addNote"><Plus :size="16" />{{ t('notes.create') }}</button>
       </div>
       <template v-else>
         <header class="note-editor-commandbar">
-          <span :class="{ saving, error: saveStatus === '保存失败' }">{{ saveStatus || '已保存' }}</span>
+          <span :class="{ saving, error: saveStatus === '保存失败' }">{{ saveStatus || t('common.saved') }}</span>
           <div>
-            <button type="button" class="icon-button" :title="selectedNote.isPinned ? '取消置顶' : '置顶笔记'" @click="togglePinned"><PinOff v-if="selectedNote.isPinned" :size="16" /><Pin v-else :size="16" /></button>
-            <button type="button" class="icon-button" title="创建副本" @click="copyCurrentNote"><Copy :size="16" /></button>
+            <button type="button" class="icon-button" :title="selectedNote.isPinned ? t('library.pin.cancel') : t('notes.pin')" @click="togglePinned"><PinOff v-if="selectedNote.isPinned" :size="16" /><Pin v-else :size="16" /></button>
+            <button type="button" class="icon-button" :title="t('notes.copy')" @click="copyCurrentNote"><Copy :size="16" /></button>
             <div class="note-export-control">
-              <button type="button" class="secondary-command" @click="exportMenuOpen = !exportMenuOpen"><Download :size="15" />导出<ChevronDown :size="14" /></button>
+              <button type="button" class="secondary-command" @click="exportMenuOpen = !exportMenuOpen"><Download :size="15" />{{ t('common.export') }}<ChevronDown :size="14" /></button>
               <div v-if="exportMenuOpen" class="note-export-menu">
                 <button type="button" @click="exportCurrentNote('markdown')"><FileText :size="15" />Markdown</button>
                 <button type="button" @click="exportCurrentNote('html')"><Braces :size="15" />HTML</button>
                 <button type="button" @click="exportCurrentNote('json')"><FileJson :size="15" />JSON</button>
               </div>
             </div>
-            <button type="button" class="icon-button danger-icon" title="删除笔记" @click="deleteDialogOpen = true"><Trash2 :size="16" /></button>
+            <button type="button" class="icon-button danger-icon" :title="t('notes.delete')" @click="deleteDialogOpen = true"><Trash2 :size="16" /></button>
           </div>
         </header>
 
         <div class="note-title-block">
-          <input v-model="title" class="note-title-input" maxlength="160" placeholder="无标题笔记" />
-          <div><span>{{ wordCount.toLocaleString() }} 字</span><span>创建于 {{ formatDate(selectedNote.createdAt) }}</span></div>
+          <input v-model="title" class="note-title-input" maxlength="160" :placeholder="t('notes.untitled')" />
+          <div><span>{{ wordCount.toLocaleString() }} {{ t('unit.wordsShort') }}</span><span>{{ t('notes.createdAt') }} {{ formatDate(selectedNote.createdAt) }}</span></div>
         </div>
 
-        <div v-if="editor" class="note-format-toolbar" role="toolbar" aria-label="笔记格式">
-          <button type="button" title="撤销" :disabled="!editor.can().chain().focus().undo().run()" @click="editor.chain().focus().undo().run()"><Undo2 :size="16" /></button>
-          <button type="button" title="重做" :disabled="!editor.can().chain().focus().redo().run()" @click="editor.chain().focus().redo().run()"><Redo2 :size="16" /></button>
+        <div v-if="editor" class="note-format-toolbar" role="toolbar" :aria-label="t('notes.format')">
+          <button type="button" :title="t('editor.undo')" :disabled="!editor.can().chain().focus().undo().run()" @click="editor.chain().focus().undo().run()"><Undo2 :size="16" /></button>
+          <button type="button" :title="t('editor.redo')" :disabled="!editor.can().chain().focus().redo().run()" @click="editor.chain().focus().redo().run()"><Redo2 :size="16" /></button>
           <i />
-          <button type="button" title="一级标题" :class="{ active: editor.isActive('heading', { level: 1 }) }" @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"><Heading1 :size="17" /></button>
-          <button type="button" title="二级标题" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="17" /></button>
-          <button type="button" title="三级标题" :class="{ active: editor.isActive('heading', { level: 3 }) }" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"><Heading3 :size="17" /></button>
+          <button type="button" :title="t('editor.heading1')" :class="{ active: editor.isActive('heading', { level: 1 }) }" @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"><Heading1 :size="17" /></button>
+          <button type="button" :title="t('editor.heading2')" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="17" /></button>
+          <button type="button" :title="t('editor.heading3')" :class="{ active: editor.isActive('heading', { level: 3 }) }" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"><Heading3 :size="17" /></button>
           <i />
-          <button type="button" title="加粗" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()"><Bold :size="16" /></button>
-          <button type="button" title="斜体" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><Italic :size="16" /></button>
-          <button type="button" title="下划线" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()"><Underline :size="16" /></button>
-          <button type="button" title="删除线" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button>
+          <button type="button" :title="t('editor.bold')" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()"><Bold :size="16" /></button>
+          <button type="button" :title="t('editor.italic')" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><Italic :size="16" /></button>
+          <button type="button" :title="t('editor.underline')" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()"><Underline :size="16" /></button>
+          <button type="button" :title="t('editor.strikethrough')" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button>
           <i />
-          <button type="button" title="无序列表" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()"><List :size="17" /></button>
-          <button type="button" title="有序列表" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()"><ListOrdered :size="17" /></button>
-          <button type="button" title="引用" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()"><Quote :size="16" /></button>
-          <button type="button" title="代码块" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button>
-          <button type="button" title="分隔线" @click="editor.chain().focus().setHorizontalRule().run()"><Minus :size="17" /></button>
+          <button type="button" :title="t('editor.bulletList')" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()"><List :size="17" /></button>
+          <button type="button" :title="t('editor.orderedList')" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()"><ListOrdered :size="17" /></button>
+          <button type="button" :title="t('editor.quote')" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()"><Quote :size="16" /></button>
+          <button type="button" :title="t('editor.codeBlock')" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button>
+          <button type="button" :title="t('editor.divider')" @click="editor.chain().focus().setHorizontalRule().run()"><Minus :size="17" /></button>
           <i />
-          <button type="button" title="添加或编辑链接" :class="{ active: editor.isActive('link') }" @click="editLink"><Link2 :size="16" /></button>
-          <button type="button" title="移除链接" :disabled="!editor.isActive('link')" @click="editor.chain().focus().unsetLink().run()"><Unlink :size="16" /></button>
+          <button type="button" :title="t('editor.link')" :class="{ active: editor.isActive('link') }" @click="editLink"><Link2 :size="16" /></button>
+          <button type="button" :title="t('editor.linkRemove')" :disabled="!editor.isActive('link')" @click="editor.chain().focus().unsetLink().run()"><Unlink :size="16" /></button>
         </div>
         <EditorContent v-if="editor" :editor="editor" class="note-editor-content" />
       </template>
     </section>
-    <UiConfirmDialog :open="deleteDialogOpen" danger title="删除这篇笔记？" :description="`“${selectedNote?.title || '无标题笔记'}”将从本机永久删除，此操作无法撤销。`" confirm-label="删除笔记" @close="deleteDialogOpen = false" @confirm="removeCurrentNote" />
+    <UiConfirmDialog :open="deleteDialogOpen" danger :title="t('notes.deleteConfirm')" :description="`“${selectedNote?.title || t('notes.untitled')}”将从本机永久删除，此操作无法撤销。`" :confirm-label="t('notes.delete')" @close="deleteDialogOpen = false" @confirm="removeCurrentNote" />
   </section>
 </template>

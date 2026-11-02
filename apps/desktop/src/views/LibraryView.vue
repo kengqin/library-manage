@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { listSeparator, t } from '@novel-library/i18n/vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, FilePlus2, FileText, Globe, RefreshCw } from 'lucide-vue-next'
@@ -36,7 +37,7 @@ async function loadBooks() {
   try {
     books.value = await listDesktopBooks({ forceRefresh: true })
   } catch (cause) {
-    showError(cause, '书架加载失败，请稍后重试')
+    showError(cause, t('library.shelf.loadFailed'))
   } finally {
     loading.value = false
     refreshing.value = false
@@ -84,14 +85,14 @@ function confirmImport() {
 }
 
 function importSelectionTitle() {
-  if (!pendingImportFiles.value.length) return '尚未选择文件'
+  if (!pendingImportFiles.value.length) return t('common.noFileSelected')
   if (pendingImportFiles.value.length === 1) return pendingImportFiles.value[0].name
-  return `已选择 ${pendingImportFiles.value.length} 个文件`
+  return t('common.filesSelected', { count: pendingImportFiles.value.length })
 }
 
 function importSelectionDetail() {
   const files = pendingImportFiles.value
-  if (!files.length) return '支持 TXT、EPUB 格式'
+  if (!files.length) return t('import.supportedFormats')
   const epubCount = files.filter(file => file.name.toLowerCase().endsWith('.epub')).length
   const txtCount = files.length - epubCount
   const formats = [
@@ -115,7 +116,7 @@ async function importBooks(files: File[], existingId?: string) {
   if (!files.length) return
   importing.value = true
   importProgress.value = 0
-  importMessage.value = '正在读取文件'
+  importMessage.value = t('common.readingFile')
   const importedIds: string[] = []
   const failures: File[] = []
   try {
@@ -136,18 +137,18 @@ async function importBooks(files: File[], existingId?: string) {
       }
       importProgress.value = Math.round((index + 1) / files.length * 100)
     }
-    importMessage.value = '正在刷新书架'
+    importMessage.value = t('library.shelf.refreshing')
     await loadBooks()
     if (failures.length) {
-      const failedNames = failures.slice(0, 2).map(file => file.name).join('、')
-      const remaining = failures.length > 2 ? `${failedNames} 等 ${failures.length} 个文件` : failedNames
-      const summary = importedIds.length ? `已导入 ${importedIds.length}/${files.length} 本书` : '书籍导入失败'
-      showGlobalMessage(`${summary}，未导入：${remaining}`, 'warning', 6000)
+      const failedNames = failures.slice(0, 2).map(file => file.name).join(listSeparator())
+      const remaining = failures.length > 2 ? t('import.multiFiles', { names: failedNames, count: failures.length }) : failedNames
+      const summary = importedIds.length ? t('library.import.donePartial', { imported: importedIds.length, total: files.length }) : t('library.import.failed')
+      showGlobalMessage(t('import.summary', { summary, files: remaining }), 'warning', 6000)
     } else if (files.length === 1 && importedIds[0]) {
-      showGlobalMessage(existingId ? '书籍已重新导入' : '书籍已导入书架')
+      showGlobalMessage(existingId ? t('library.import.reimported') : t('library.import.added'))
       await router.push(`/book/${importedIds[0]}`)
     } else {
-      showGlobalMessage(`已导入 ${importedIds.length} 本书`)
+      showGlobalMessage(t('library.import.doneCount', { count: importedIds.length }))
     }
   } finally {
     importing.value = false
@@ -162,7 +163,7 @@ async function importExternalFile(event: Event) {
     const external = await readDesktopExternalFile(detail.path)
     await importBooks([new File([new Uint8Array(external.bytes)], external.name)], detail.existingId)
   } catch (cause) {
-    showError(cause, '书籍导入失败，请检查文件后重试')
+    showError(cause, t('library.import.failedDetail'))
   }
 }
 
@@ -174,9 +175,9 @@ async function removeBook() {
     await deleteDesktopBook(book.id)
     books.value = books.value.filter(item => item.id !== book.id)
     pendingDeleteBook.value = undefined
-    showGlobalMessage(`《${book.title}》已删除`)
+    showGlobalMessage(t('library.deleted', { title: book.title }))
   } catch (cause) {
-    showError(cause, '书籍删除失败，请稍后重试')
+    showError(cause, t('library.delete.failed'))
   } finally {
     deleting.value = false
   }
@@ -191,31 +192,31 @@ onBeforeUnmount(() => window.removeEventListener('novel-library-import', importE
 
 <template>
   <section class="workspace-view">
-    <PageHeader title="我的书架">
+    <PageHeader :title="t('library.shelf.mine')">
       <template #actions>
-        <button type="button" class="secondary-command" @click="router.push('/online')"><Globe :size="17" />在线找书</button>
-        <button type="button" class="icon-button" title="刷新书架" :disabled="loading || refreshing" @click="loadBooks"><RefreshCw :size="18" :class="{ spinning: refreshing }" /></button>
-        <button type="button" class="primary-command primary-command--core" :disabled="importing" @click="openImportDialog"><FilePlus2 :size="18" />{{ importing ? '正在导入' : '导入书籍' }}</button>
+        <button type="button" class="secondary-command" @click="router.push('/online')"><Globe :size="17" />{{ t('online.find') }}</button>
+        <button type="button" class="icon-button" :title="t('library.shelf.refresh')" :disabled="loading || refreshing" @click="loadBooks"><RefreshCw :size="18" :class="{ spinning: refreshing }" /></button>
+        <button type="button" class="primary-command primary-command--core" :disabled="importing" @click="openImportDialog"><FilePlus2 :size="18" />{{ importing ? t('common.importing') : t('library.import.action') }}</button>
         <input ref="fileInput" type="file" accept=".txt,.epub,text/plain,application/epub+zip" multiple hidden @change="selectImportFile" />
       </template>
     </PageHeader>
 
     <div v-if="importing" class="import-status" role="status"><div><span :style="{ width: `${importProgress}%` }" /></div><strong>{{ importMessage }}</strong><small>{{ importProgress }}%</small></div>
-    <div v-if="loading" class="view-status" role="status">正在读取本地书架...</div>
+    <div v-if="loading" class="view-status" role="status">{{ t('library.shelf.loading') }}</div>
     <div v-else-if="!books.length && !importing" class="empty-library">
       <BookOpen :size="34" />
-      <h2>书架为空</h2>
-      <button type="button" class="primary-command primary-command--core" @click="openImportDialog"><FilePlus2 :size="17" />导入第一本书</button>
+      <h2>{{ t('library.shelf.emptyShort') }}</h2>
+      <button type="button" class="primary-command primary-command--core" @click="openImportDialog"><FilePlus2 :size="17" />{{ t('library.empty.importFirst') }}</button>
     </div>
     <div v-else class="book-grid">
       <BookCard v-for="book in books" :key="book.id" :book="book" @open="router.push(`/book/${book.id}`)" @read="router.push(`/read/${book.id}/${book.currentChapter}`)" @privacy="router.push({ path: `/read/${book.id}/${book.currentChapter}`, query: { privacy: '1' } })" @request-delete="pendingDeleteBook = book" />
     </div>
     <UiConfirmDialog
       :open="importDialogOpen"
-      title="导入书籍"
-      description="选择本地书籍文件，可一次导入多本。"
-      :confirm-label="pendingImportFiles.length > 1 ? `确认导入（${pendingImportFiles.length}）` : '确认导入'"
-      cancel-label="取消"
+      :title="t('library.import.action')"
+      :description="t('import.selectFiles')"
+      :confirm-label="pendingImportFiles.length > 1 ? `确认导入（${pendingImportFiles.length}）` : t('import.confirm')"
+      :cancel-label="t('common.cancel')"
       :confirm-disabled="!pendingImportFiles.length"
       @close="closeImportDialog"
       @confirm="confirmImport"
@@ -226,16 +227,16 @@ onBeforeUnmount(() => window.removeEventListener('novel-library-import', importE
           <strong :title="pendingImportFiles.map(file => file.name).join('\n')">{{ importSelectionTitle() }}</strong>
           <small>{{ importSelectionDetail() }}</small>
         </div>
-        <button type="button" class="secondary-command" @click="chooseImportFile">{{ pendingImportFiles.length ? '重新选择' : '选择文件' }}</button>
+        <button type="button" class="secondary-command" @click="chooseImportFile">{{ pendingImportFiles.length ? t('common.chooseAgain') : t('common.chooseFile') }}</button>
       </div>
     </UiConfirmDialog>
     <UiConfirmDialog
       :open="Boolean(pendingDeleteBook)"
       :busy="deleting"
       danger
-      title="删除这本书？"
-      :description="`《${pendingDeleteBook?.title || ''}》及其全部章节、阅读进度将从本机删除，此操作无法撤销。`"
-      confirm-label="删除书籍"
+      :title="t('library.delete.confirmTitle')"
+      :description="t('library.delete.confirmDetail', { title: pendingDeleteBook?.title || '' })"
+      :confirm-label="t('library.delete.action')"
       @close="pendingDeleteBook = undefined"
       @confirm="removeBook"
     />
