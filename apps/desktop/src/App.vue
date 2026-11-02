@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -30,7 +31,7 @@ const auxiliaryShell = browserShell || settingsShell || overlayShell || historyS
 const workspaceVersion = ref(0)
 const immersive = computed(() => route.meta.layout === 'reader')
 watch(immersive, suspended => {
-  if (isTauri() && !auxiliaryShell) void invoke('set_web_browser_suspended', { suspended }).catch(cause => showGlobalError(cause, '网页侧栏状态更新失败'))
+  if (isTauri() && !auxiliaryShell) void invoke('set_web_browser_suspended', { suspended }).catch(cause => showGlobalError(cause, t('browser.sidebarStateFailed')))
 }, { immediate: true })
 useAppearance()
 let unlistenImport: UnlistenFn | undefined
@@ -41,9 +42,9 @@ let unlistenSettings: UnlistenFn | undefined
 onMounted(async () => {
   if (!isTauri()) return
   if (browserShell || overlayShell || historyShell || updateShell) return
-  if (settingsShell) { void initializeUpdateEvents().catch(cause => showGlobalError(cause, '更新服务初始化失败')); return }
-  void initializeWebBrowser().catch(cause => showGlobalError(cause, '网页浏览器初始化失败'))
-  void initializeOnlineLibrary().catch(cause => showGlobalError(cause, '在线书架初始化失败'))
+  if (settingsShell) { void initializeUpdateEvents().catch(cause => showGlobalError(cause, t('update.serviceInitFailed'))); return }
+  void initializeWebBrowser().catch(cause => showGlobalError(cause, t('browser.initFailed')))
+  void initializeOnlineLibrary().catch(cause => showGlobalError(cause, t('online.initFailed')))
   try {
     unlistenSettings = await listen('settings-data-changed', async () => { await router.push('/library'); workspaceVersion.value++ })
     unlistenImport = await listen<{ path: string; existingId?: string }>('bridge-import-requested', async event => {
@@ -56,9 +57,9 @@ onMounted(async () => {
     void initializeUpdateEvents().then(() => {
       if (isAutoCheckEnabled()) void checkForUpdates(true)
       configureBackgroundUpdateChecks()
-    }).catch(cause => showGlobalError(cause, '更新服务初始化失败，请重启应用后重试'))
+    }).catch(cause => showGlobalError(cause, t('update.serviceInitFailedDetail')))
   } catch (cause) {
-    showGlobalError(cause, '应用服务初始化失败，请重启应用后重试')
+    showGlobalError(cause, t('app.initFailed'))
   }
 })
 

@@ -1,3 +1,4 @@
+import { t } from '@novel-library/i18n/vue'
 import { getAvailableMobileUpdate, isMobileUpdateManifest, type AvailableMobileUpdate, type MobileUpdatePlatform, type MobileUpdateManifest, type UpdateChannel } from '@novel-library/reader-protocol'
 import localManifest from '../data/mobile-releases.json'
 import { Capacitor } from '@capacitor/core'
@@ -27,7 +28,7 @@ export async function checkMobileUpdate(options: MobileUpdateCheckOptions): Prom
     if (options.manifestUrl === undefined && fetcher === fetch) payload = localManifest
     else throw cause
   }
-  if (!isMobileUpdateManifest(payload, MOBILE_APP_ID)) throw new Error('移动端版本清单格式无效')
+  if (!isMobileUpdateManifest(payload, MOBILE_APP_ID)) throw new Error(t('update.mobileManifestInvalid'))
   return getAvailableMobileUpdate(options.currentVersion, payload as MobileUpdateManifest, options.platform, options.channel ?? 'stable')
 }
 

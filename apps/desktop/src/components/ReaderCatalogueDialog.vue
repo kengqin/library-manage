@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, nextTick, ref } from 'vue'
 import { Search, X } from 'lucide-vue-next'
 import { formatChapterLabel } from '@novel-library/reader-core'
@@ -38,19 +39,19 @@ defineExpose({ show })
   <dialog ref="dialog" class="reader-catalogue" aria-labelledby="reader-catalogue-title" @click="event => { if (event.target === dialog) dialog?.close() }" @keydown.stop>
     <section class="reader-catalogue-surface">
       <header>
-        <h2 id="reader-catalogue-title">目录 <small>共 {{ chapters.length }} 项</small></h2>
-        <button class="catalogue-close" type="button" aria-label="关闭目录" @click="dialog?.close()"><X :size="18" /></button>
+        <h2 id="reader-catalogue-title">{{ t('contents.title') }} <small>{{ t('unit.totalItems', { count: chapters.length }) }}</small></h2>
+        <button class="catalogue-close" type="button" :aria-label="t('contents.close')" @click="dialog?.close()"><X :size="18" /></button>
       </header>
       <div class="catalogue-tools">
-        <label><Search :size="15" /><input v-model="query" autofocus placeholder="搜索章节或卷名" aria-label="搜索章节或卷名" /></label>
-        <button type="button" @click="locate">当前章节</button>
-        <button type="button" :aria-pressed="reversed" @click="reversed = !reversed">{{ reversed ? '恢复正序' : '倒序' }}</button>
+        <label><Search :size="15" /><input v-model="query" autofocus :placeholder="t('contents.search.placeholder')" :aria-label="t('contents.search.placeholder')" /></label>
+        <button type="button" @click="locate">{{ t('reader.currentChapter') }}</button>
+        <button type="button" :aria-pressed="reversed" @click="reversed = !reversed">{{ reversed ? t('library.sort.asc') : t('library.sort.desc') }}</button>
       </div>
-      <nav class="catalogue-list" aria-label="章节目录">
+      <nav class="catalogue-list" :aria-label="t('contents.chapterList')">
         <button v-for="item in visibleChapters" :key="item.number" type="button" :aria-current="item.number === current ? 'page' : undefined" :title="label(item)" @click="select(item.number)">
-          <span>{{ label(item) }}</span><small v-if="item.number === current">正在阅读</small>
+          <span>{{ label(item) }}</span><small v-if="item.number === current">{{ t('library.status.reading') }}</small>
         </button>
-        <p v-if="!visibleChapters.length" class="catalogue-empty">没有找到匹配的章节</p>
+        <p v-if="!visibleChapters.length" class="catalogue-empty">{{ t('contents.search.empty') }}</p>
       </nav>
     </section>
   </dialog>

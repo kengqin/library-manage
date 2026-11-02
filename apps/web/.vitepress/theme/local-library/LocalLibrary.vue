@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowLeft, ArrowRight, BookOpen, Database, Download, FilePlus2, HardDrive, LibraryBig, Palette, RefreshCw, Search, Settings2, Trash2, Upload, X } from 'lucide-vue-next'
 import { withBase } from 'vitepress'
@@ -32,7 +33,7 @@ const filteredChapters = computed(() => {
 const chapterGroups = computed(() => {
   const groups = new Map<string, LocalChapter[]>()
   for (const chapter of filteredChapters.value) {
-    const key = chapter.volume || '正文'
+    const key = chapter.volume || t('reader.text')
     const items = groups.get(key) ?? []
     items.push(chapter)
     groups.set(key, items)
@@ -128,7 +129,7 @@ function startImport(existing?: LocalBook) {
 async function imported(book: LocalBook) {
   await refreshBooks()
   await openBook(book.id)
-  showToast(`《${book.title}》已保存到本地书架`)
+  showToast(t('library.savedToShelf', { title: book.title }))
 }
 
 async function saveTheme(theme: ThemeSettings, cover?: Blob) {
@@ -141,7 +142,7 @@ async function saveTheme(theme: ThemeSettings, cover?: Blob) {
 }
 
 async function removeBook(book: LocalBook) {
-  if (!window.confirm(`确认从当前浏览器删除《${book.title}》及全部章节吗？`)) return
+  if (!window.confirm(t('library.delete.confirmWeb', { title: book.title }))) return
   await deleteBook(book.id)
   await refreshBooks()
   await showShelf()
@@ -168,7 +169,7 @@ async function restoreBackup(event: Event) {
     await refreshBooks()
     showToast('本地书架备份已恢复')
   } catch (cause) {
-    showToast(cause instanceof Error ? cause.message : '恢复失败')
+    showToast(cause instanceof Error ? cause.message : t('storage.backup.restoreFailedShort'))
   }
   ;(event.target as HTMLInputElement).value = ''
 }
@@ -179,7 +180,7 @@ async function showStorage() {
 }
 
 async function clearAll() {
-  if (!window.confirm('确认清空当前浏览器中的全部本地书籍吗？此操作无法撤销。')) return
+  if (!window.confirm(t('library.clear.confirmWeb'))) return
   await clearLibrary()
   storageOpen.value = false
   await refreshBooks()
@@ -211,20 +212,20 @@ onBeforeUnmount(() => {
 <template>
   <LocalReader v-if="selectedBook && selectedChapter" :book="selectedBook" :chapters="chapters" :chapter="selectedChapter" :cover-url="coverFor(selectedBook)" @back="openBook(selectedBook.id)" @open="openChapter" @progress="saveProgress" />
   <div v-else class="local-library">
-    <header class="local-library-nav"><a :href="withBase('/')"><LibraryBig :size="21" /><strong>小说书库</strong></a><nav><button type="button" @click="startImport()"><FilePlus2 :size="16" /> 导入 TXT</button><button type="button" title="导出备份" @click="downloadBackup"><Download :size="16" /></button><button type="button" title="恢复备份" @click="backupInput?.click()"><Upload :size="16" /></button><button type="button" title="存储管理" @click="showStorage"><Settings2 :size="16" /></button><input ref="backupInput" type="file" accept="application/json,.json" hidden @change="restoreBackup" /></nav></header>
+    <header class="local-library-nav"><a :href="withBase('/')"><LibraryBig :size="21" /><strong>{{ t('app.name') }}</strong></a><nav><button type="button" @click="startImport()"><FilePlus2 :size="16" /> {{ t('import.txt.action') }}</button><button type="button" :title="t('storage.backup.export')" @click="downloadBackup"><Download :size="16" /></button><button type="button" :title="t('storage.backup.restore')" @click="backupInput?.click()"><Upload :size="16" /></button><button type="button" :title="t('storage.title')" @click="showStorage"><Settings2 :size="16" /></button><input ref="backupInput" type="file" accept="application/json,.json" hidden @change="restoreBackup" /></nav></header>
 
-    <main v-if="!selectedBook" class="local-shelf"><section class="local-shelf-hero"><p>LOCAL · PRIVATE · OFFLINE</p><h1>我的本地书架</h1><span>TXT 只在当前浏览器中解析。书籍、章节与阅读进度不会上传服务器。</span><button type="button" @click="startImport()"><FilePlus2 :size="18" /> 导入第一本小说</button></section>
-      <section v-if="books.length" class="local-book-grid"><article v-for="book in books" :key="book.id" class="local-book-card" :style="{ '--book-accent': book.theme.accent, '--book-bg': book.theme.background, '--book-text': book.theme.text }"><button type="button" class="local-book-cover" :style="{ backgroundColor: book.theme.background, backgroundImage: coverFor(book) ? `linear-gradient(rgba(0,0,0,${book.theme.overlay / 100}),rgba(0,0,0,${book.theme.overlay / 100})),url(${coverFor(book)})` : undefined, backgroundPosition: `${book.theme.positionX}% ${book.theme.positionY}%` }" @click="openBook(book.id)"><span>本地书籍</span><strong>{{ book.title }}</strong><small>{{ book.author }}</small></button><div><p>{{ book.chapterCount }} 章 · {{ book.totalWords.toLocaleString() }} 字</p><div class="local-book-progress"><span :style="{ width: `${book.progress}%` }" /></div><footer><button type="button" @click="continueBook(book)"><BookOpen :size="15" /> 继续阅读</button><button type="button" title="删除" @click="removeBook(book)"><Trash2 :size="15" /></button></footer></div></article></section>
-      <section v-else class="local-empty"><Database :size="32" /><h2>本地书架还是空的</h2><p>导入 TXT 后，平台会自动识别书名、作者、章节和自然段。</p></section>
+    <main v-if="!selectedBook" class="local-shelf"><section class="local-shelf-hero"><p>LOCAL · PRIVATE · OFFLINE</p><h1>{{ t('library.shelf.mineLocal') }}</h1><span>{{ t('import.txt.privacyMobile') }}</span><button type="button" @click="startImport()"><FilePlus2 :size="18" /> {{ t('library.empty.importFirstNovel') }}</button></section>
+      <section v-if="books.length" class="local-book-grid"><article v-for="book in books" :key="book.id" class="local-book-card" :style="{ '--book-accent': book.theme.accent, '--book-bg': book.theme.background, '--book-text': book.theme.text }"><button type="button" class="local-book-cover" :style="{ backgroundColor: book.theme.background, backgroundImage: coverFor(book) ? `linear-gradient(rgba(0,0,0,${book.theme.overlay / 100}),rgba(0,0,0,${book.theme.overlay / 100})),url(${coverFor(book)})` : undefined, backgroundPosition: `${book.theme.positionX}% ${book.theme.positionY}%` }" @click="openBook(book.id)"><span>{{ t('library.books.local') }}</span><strong>{{ book.title }}</strong><small>{{ book.author }}</small></button><div><p>{{ book.chapterCount }} {{ t('unit.chaptersPrefix') }} {{ book.totalWords.toLocaleString() }} {{ t('unit.wordsShort') }}</p><div class="local-book-progress"><span :style="{ width: `${book.progress}%` }" /></div><footer><button type="button" @click="continueBook(book)"><BookOpen :size="15" /> {{ t('library.continueReading') }}</button><button type="button" :title="t('common.delete')" @click="removeBook(book)"><Trash2 :size="15" /></button></footer></div></article></section>
+      <section v-else class="local-empty"><Database :size="32" /><h2>{{ t('library.shelf.emptyLocal') }}</h2><p>{{ t('import.txt.description') }}</p></section>
     </main>
 
-    <main v-else class="local-book-detail"><section class="local-book-hero" :style="{ '--book-accent': selectedBook.theme.accent, '--book-bg': selectedBook.theme.background, '--book-text': selectedBook.theme.text, backgroundColor: selectedBook.theme.background, backgroundImage: coverFor(selectedBook) ? `linear-gradient(rgba(0,0,0,${selectedBook.theme.overlay / 100}),rgba(0,0,0,${selectedBook.theme.overlay / 100})),url(${coverFor(selectedBook)})` : undefined, backgroundPosition: `${selectedBook.theme.positionX}% ${selectedBook.theme.positionY}%` }"><button type="button" class="local-back" @click="showShelf()"><ArrowLeft :size="16" /> 本地书架</button><div><p>LOCAL BOOK · {{ selectedBook.chapterCount }} CHAPTERS</p><h1>{{ selectedBook.title }}</h1><span>{{ selectedBook.author }}</span><blockquote>{{ selectedBook.description || '这本书暂时没有简介。' }}</blockquote><div><button type="button" class="local-button-primary" @click="openChapter(selectedBook.currentChapter)"><BookOpen :size="17" /> {{ selectedBook.progress ? '继续阅读' : '开始阅读' }}</button><button type="button" @click="themeOpen = true"><Palette :size="17" /> 主题配置</button><button type="button" @click="startImport(selectedBook)"><RefreshCw :size="17" /> 重新解析</button><button type="button" @click="removeBook(selectedBook)"><Trash2 :size="17" /> 删除</button></div></div></section>
-      <section class="local-catalogue"><header><div><p>TABLE OF CONTENTS</p><h2>章节目录</h2></div><label><Search :size="17" /><input v-model="query" placeholder="搜索章号、章名或卷名" /><button v-if="query" type="button" @click="query = ''"><X :size="15" /></button></label></header><div v-if="chapterGroups.length" class="local-volume-list"><section v-for="group in chapterGroups" :key="group.name"><h3>{{ group.name }} <span>{{ group.items.length }} 章</span></h3><div><button v-for="chapter in group.items" :key="chapter.id" type="button" @click="openChapter(chapter.number)"><small>{{ formatChapterLabel(chapter) }}</small><span>{{ chapter.title }}</span><ArrowRight :size="14" /></button></div></section></div><p v-else class="local-no-result">没有找到匹配章节</p></section>
+    <main v-else class="local-book-detail"><section class="local-book-hero" :style="{ '--book-accent': selectedBook.theme.accent, '--book-bg': selectedBook.theme.background, '--book-text': selectedBook.theme.text, backgroundColor: selectedBook.theme.background, backgroundImage: coverFor(selectedBook) ? `linear-gradient(rgba(0,0,0,${selectedBook.theme.overlay / 100}),rgba(0,0,0,${selectedBook.theme.overlay / 100})),url(${coverFor(selectedBook)})` : undefined, backgroundPosition: `${selectedBook.theme.positionX}% ${selectedBook.theme.positionY}%` }"><button type="button" class="local-back" @click="showShelf()"><ArrowLeft :size="16" /> {{ t('nav.localShelf') }}</button><div><p>LOCAL BOOK · {{ selectedBook.chapterCount }} CHAPTERS</p><h1>{{ selectedBook.title }}</h1><span>{{ selectedBook.author }}</span><blockquote>{{ selectedBook.description || t('library.synopsis.emptyDetail') }}</blockquote><div><button type="button" class="local-button-primary" @click="openChapter(selectedBook.currentChapter)"><BookOpen :size="17" /> {{ selectedBook.progress ? t('library.continueReading') : t('library.startReading') }}</button><button type="button" @click="themeOpen = true"><Palette :size="17" /> {{ t('reader.theme.settings') }}</button><button type="button" @click="startImport(selectedBook)"><RefreshCw :size="17" /> {{ t('parse.retry') }}</button><button type="button" @click="removeBook(selectedBook)"><Trash2 :size="17" /> {{ t('common.delete') }}</button></div></div></section>
+      <section class="local-catalogue"><header><div><p>TABLE OF CONTENTS</p><h2>{{ t('contents.chapterList') }}</h2></div><label><Search :size="17" /><input v-model="query" :placeholder="t('contents.search.placeholderShort')" /><button v-if="query" type="button" @click="query = ''"><X :size="15" /></button></label></header><div v-if="chapterGroups.length" class="local-volume-list"><section v-for="group in chapterGroups" :key="group.name"><h3>{{ group.name }} <span>{{ group.items.length }} {{ t('unit.chaptersShort') }}</span></h3><div><button v-for="chapter in group.items" :key="chapter.id" type="button" @click="openChapter(chapter.number)"><small>{{ formatChapterLabel(chapter) }}</small><span>{{ chapter.title }}</span><ArrowRight :size="14" /></button></div></section></div><p v-else class="local-no-result">{{ t('contents.search.emptyShort') }}</p></section>
     </main>
   </div>
 
   <ImportNovelModal :open="importOpen" :existing-book="importExisting" @close="importOpen = false" @imported="imported" />
   <ThemeEditor :open="themeOpen" :book="selectedBook" :cover-url="selectedBook ? coverFor(selectedBook) : undefined" @close="themeOpen = false" @save="saveTheme" />
-  <Teleport to="body"><div v-if="storageOpen" class="local-modal-backdrop" @mousedown.self="storageOpen = false"><section class="local-modal storage-modal"><header><div><small>LOCAL STORAGE</small><h2>本地存储管理</h2></div><button type="button" @click="storageOpen = false"><X :size="19" /></button></header><div class="storage-stats"><span><LibraryBig :size="20" /><b>{{ storageStats.books }}</b> 本书</span><span><FilePlus2 :size="20" /><b>{{ storageStats.chapters }}</b> 章</span><span><HardDrive :size="20" /><b>{{ formatSize(storageStats.usage) }}</b> 已使用</span></div><p>浏览器可用配额约 {{ formatSize(storageStats.quota) }}。清理浏览器站点数据也会删除本地书架，请定期导出备份。</p><footer><button type="button" class="local-button-secondary" @click="downloadBackup"><Download :size="16" /> 导出备份</button><button type="button" class="local-danger-button" @click="clearAll"><Trash2 :size="16" /> 清空本地书架</button></footer></section></div></Teleport>
+  <Teleport to="body"><div v-if="storageOpen" class="local-modal-backdrop" @mousedown.self="storageOpen = false"><section class="local-modal storage-modal"><header><div><small>LOCAL STORAGE</small><h2>{{ t('storage.local.title') }}</h2></div><button type="button" @click="storageOpen = false"><X :size="19" /></button></header><div class="storage-stats"><span><LibraryBig :size="20" /><b>{{ storageStats.books }}</b> {{ t('unit.bookPlural') }}</span><span><FilePlus2 :size="20" /><b>{{ storageStats.chapters }}</b> {{ t('unit.chaptersShort') }}</span><span><HardDrive :size="20" /><b>{{ formatSize(storageStats.usage) }}</b> {{ t('storage.usage.used') }}</span></div><p>{{ t('storage.usage.quota') }} {{ formatSize(storageStats.quota) }}{{ t('library.web.clearHint') }}</p><footer><button type="button" class="local-button-secondary" @click="downloadBackup"><Download :size="16" /> {{ t('storage.backup.export') }}</button><button type="button" class="local-danger-button" @click="clearAll"><Trash2 :size="16" /> {{ t('library.clear.shelf') }}</button></footer></section></div></Teleport>
   <Transition name="local-toast"><div v-if="toast" class="local-toast">{{ toast }}</div></Transition>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { LoaderCircle } from 'lucide-vue-next'
 defineProps<{ label: string; cancellable?: boolean }>()
 defineEmits<{ cancel: [] }>()
@@ -6,7 +7,7 @@ defineEmits<{ cancel: [] }>()
 
 <template>
   <div class="online-search-loading" aria-busy="true">
-    <div class="online-skeleton-heading" role="status"><LoaderCircle :size="16" class="spinning" /><span>{{ label }}</span><button v-if="cancellable" type="button" class="text-command" @click="$emit('cancel')">取消</button></div>
+    <div class="online-skeleton-heading" role="status"><LoaderCircle :size="16" class="spinning" /><span>{{ label }}</span><button v-if="cancellable" type="button" class="text-command" @click="$emit('cancel')">{{ t('common.cancel') }}</button></div>
     <div aria-hidden="true"><div v-for="row in 10" :key="row" class="online-skeleton-row"><i class="online-skeleton-site" /><i class="online-skeleton-title" :style="{ width: `${48 + row % 3 * 10}%` }" /><i class="online-skeleton-description" /></div></div>
   </div>
 </template>

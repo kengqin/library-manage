@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -22,6 +23,8 @@ import { cancelBrowserSearch, checkOnlineUpdates, downloadOnlineBook, onlineBook
 
 const route = useRoute()
 const router = useRouter()
+// 搜索引擎名称来自常量表，包一层 computed 才能跟随语言切换
+const engineOptions = computed(() => searchEngineOptions.map(option => ({ ...option, label: t(option.label) })))
 const query = toRef(onlineSearchSession, 'query')
 const resultPages = toRef(onlineSearchSession, 'pages')
 const hits = computed(() => resultPages.value[onlineSearchSession.page - 1] || [])
@@ -57,18 +60,18 @@ const parseVerification = computed(() => {
   return source ? onlineVerifications.value.find(item => new URL(item.url).hostname.replace(/^www\./u, '') === new URL(source).hostname.replace(/^www\./u, '')) : undefined
 })
 const parseStatus = computed(() => {
-  if (parseVerification.value) return '等待网页验证'
+  if (parseVerification.value) return t('browser.verify.waiting')
   const progress = activeDiscovery.value?.state.progress
-  return !progress || !progress.pages ? '正在读取网页' : progress.chapters ? `已识别 ${progress.chapters} 章 · 正在整理目录` : `正在识别第 ${progress.pages} 页`
+  return !progress || !progress.pages ? t('browser.reading') : progress.chapters ? `已识别 ${progress.chapters} 章 · 正在整理目录` : `正在识别第 ${progress.pages} 页`
 })
 watch(() => [parsePopupVisible.value, parseStatus.value, activeDiscovery.value?.url, Boolean(parseVerification.value)], () => {
   if (!isTauri()) return
   const id = parsePopupId
-  const input = { id, text: activeDiscovery.value ? new URL(activeDiscovery.value.url).hostname : '', subtitle: parseStatus.value, action: parseVerification.value ? '打开验证窗口' : undefined }
+  const input = { id, text: activeDiscovery.value ? new URL(activeDiscovery.value.url).hostname : '', subtitle: parseStatus.value, action: parseVerification.value ? t('browser.verify.open') : undefined }
   popupQueue = popupQueue.then(async () => {
     if (alive && parsePopupVisible.value && parsePopupId === id) { if (parseStatus.value === input.subtitle) await invoke('show_floating_layer', { kind: 'progress', input }) }
     else await invoke('hide_floating_layer', { kind: 'progress', id })
-  }).catch(cause => showGlobalError(cause, '解析弹框打开失败'))
+  }).catch(cause => showGlobalError(cause, t('parse.dialogFailed')))
 }, { flush: 'post' })
 const description = computed(() => {
   const text = (catalog.value?.description || '').replace(/\\[nr]/gu, ' ')
@@ -96,7 +99,7 @@ const taskBooks = computed(() => visibleTasks.value.filter(book => taskFilter.va
   || (taskFilter.value === 'complete' && completed(book))))
 const completedCount = computed(() => visibleTasks.value.filter(completed).length)
 const activeCount = computed(() => onlineBooks.value.filter(b => b.state === 'downloading').length)
-const labels: Record<string, string> = { idle: '按需阅读', downloading: '下载中', paused: '已暂停', cancelled: '已取消', complete: '已下载', failed: '下载未完成' }
+const labels: Record<string, string> = { idle: t('online.book.readOnDemand'), downloading: t('downloads.downloading'), paused: t('common.paused'), cancelled: t('common.cancelled'), complete: t('common.downloaded'), failed: t('downloads.unfinished') }
 const cached = (id: string) => onlineBooks.value.find(b => b.bookId === id)?.chapters.filter(c => c.status === 'cached').length || 0
 
 async function analyze(url: string) {
@@ -116,10 +119,10 @@ async function submit(useBrowser = false) {
   const value = query.value.trim()
   if (!value || busy.value) return
   if (httpUrl(value)) return analyze(value)
-  if (/^\w+:\/\//u.test(value)) { showGlobalMessage('请输入 HTTP 或 HTTPS 网页链接', 'warning'); return }
+  if (/^\w+:\/\//u.test(value)) { showGlobalMessage(t('browser.url.invalidLink'), 'warning'); return }
   if (onlineSearchSettings.provider === 'brave' && !onlineSearchSettings.apiKey.trim()) {
     apiKeyInput.value?.focus()
-    showGlobalMessage('请填写搜索密钥', 'warning')
+    showGlobalMessage(t('search.braveApiKeyRequired'), 'warning')
     return
   }
   searching.value = true
@@ -174,7 +177,7 @@ async function changePage(number: number) {
       onlineSearchSession.page = resultPages.value.length
       await nextTick()
       document.querySelector('.app-workspace')?.scrollTo({ top: 0 })
-    } else showGlobalMessage('没有更多结果', 'info')
+    } else showGlobalMessage(t('search.noMore'), 'info')
   } catch (cause) { pageError.value = cause instanceof Error ? cause.message : String(cause) }
   finally { loadingMore.value = false; searchingWithBrowser.value = false; browserConfirmation.value = false }
 }
@@ -228,9 +231,9 @@ async function start(read: boolean, number?: number) {
     else {
       void downloadOnlineBook(bookId)
       showTasks.value = true
-      showGlobalMessage('已开始下载')
+      showGlobalMessage(t('downloads.started'))
     }
-  } catch (cause) { showGlobalError(cause, '加入书架失败') }
+  } catch (cause) { showGlobalError(cause, t('library.shelf.addFailed')) }
   finally { starting.value = false }
 }
 
@@ -239,14 +242,14 @@ async function check(bookId: string) {
   try {
     const count = await checkOnlineUpdates(bookId)
     if (!onlineBooks.value.find(book => book.bookId === bookId)?.taskVisible) return
-    showGlobalMessage(count ? `新增 ${count} 章，已开始下载` : '目录已是最新')
+    showGlobalMessage(count ? `新增 ${count} 章，已开始下载` : t('online.contents.upToDate'))
     if (count) void downloadOnlineBook(bookId)
-  } catch (cause) { if (!(cause instanceof DOMException && cause.name === 'AbortError')) showGlobalError(cause, '检查更新失败') }
+  } catch (cause) { if (!(cause instanceof DOMException && cause.name === 'AbortError')) showGlobalError(cause, t('update.checkFailed')) }
   finally { checking.value = '' }
 }
 
 async function action(work: () => Promise<unknown>) {
-  try { await work() } catch (cause) { showGlobalError(cause, '操作失败，请稍后重试') }
+  try { await work() } catch (cause) { showGlobalError(cause, t('common.actionFailed')) }
 }
 async function external(url: string) {
   await action(() => openWebPage(url))
@@ -260,7 +263,7 @@ async function removeTask(book: OnlineBook, event: Event) {
   await action(async () => {
     await removeOnlineTask(book.bookId)
     if (route.query.book === book.bookId) await router.replace({ query: { ...route.query, book: undefined, tab: 'tasks' } })
-    showGlobalMessage('任务已移除，书籍已保留')
+    showGlobalMessage(t('downloads.taskRemoved'))
   })
 }
 async function deleteBook() {
@@ -269,8 +272,8 @@ async function deleteBook() {
   try {
     await deleteDesktopBook(pendingDelete.value.bookId)
     pendingDelete.value = undefined
-    showGlobalMessage('书籍已删除')
-  } catch (cause) { showGlobalError(cause, '删除失败，请重试') }
+    showGlobalMessage(t('library.delete.done'))
+  } catch (cause) { showGlobalError(cause, t('common.deleteFailed')) }
   finally { deleting.value = false }
 }
 async function clearCompleted() {
@@ -279,7 +282,7 @@ async function clearCompleted() {
     const ids = visibleTasks.value.filter(completed).map(book => book.bookId)
     for (const id of ids) await removeOnlineTask(id)
     if (ids.includes(String(route.query.book))) await router.replace({ query: { ...route.query, book: undefined, tab: 'tasks' } })
-    showGlobalMessage('已清除完成任务，书籍已保留')
+    showGlobalMessage(t('downloads.clearedDone'))
   })
   clearing.value = false
 }
@@ -315,7 +318,7 @@ watch(() => activeDiscovery.value?.state.finished, finished => {
   if (job?.state.error) {
     onlineSearchSession.failures[job.url] = job.state.error
     if (/未能可靠识别目录或正文|这是网站首页/u.test(job.state.error)) void external(job.url)
-    else showGlobalError(job.state.error, '网页解析失败')
+    else showGlobalError(job.state.error, t('browser.parseFailed'))
   }
 })
 watch(() => onlineSearchSettings.provider, value => {
@@ -333,12 +336,12 @@ onBeforeUnmount(() => { alive = false; popupListeners.forEach(unlisten => unlist
 
 <template>
   <section class="workspace-view online-view">
-    <PageHeader :title="showTasks ? '下载任务' : '在线找书'">
+    <PageHeader :title="showTasks ? t('downloads.title') : t('online.find')">
       <template #actions>
-        <button v-if="!showTasks" type="button" class="icon-button" title="打开网页" aria-label="打开网页" @click="external('https://cn.bing.com/')"><Globe2 :size="17" /></button>
+        <button v-if="!showTasks" type="button" class="icon-button" :title="t('browser.open')" :aria-label="t('browser.open')" @click="external('https://cn.bing.com/')"><Globe2 :size="17" /></button>
         <button type="button" class="secondary-command" @click="showTasks = !showTasks">
           <ArrowLeft v-if="showTasks" :size="16" /><Download v-else :size="16" />
-          {{ showTasks ? '返回找书' : '下载任务' }}<span v-if="!showTasks && activeCount" class="task-count">{{ activeCount }}</span>
+          {{ showTasks ? t('online.back') : t('downloads.title') }}<span v-if="!showTasks && activeCount" class="task-count">{{ activeCount }}</span>
         </button>
       </template>
     </PageHeader>
@@ -346,77 +349,77 @@ onBeforeUnmount(() => { alive = false; popupListeners.forEach(unlisten => unlist
     <div v-if="!showTasks" class="search-stage">
       <div class="online-search-row"><form class="search-control" role="search" @submit.prevent="submit()">
         <Search :size="19" />
-        <input v-model="query" aria-label="书名、作者或网页链接" placeholder="搜索书名、作者，或粘贴网页链接" :disabled="busy" />
-        <button v-if="query && !busy" type="button" class="clear-search" title="清空" aria-label="清空搜索" @click="clear"><X :size="16" /></button>
-        <button type="submit" class="primary-command" :disabled="busy || !query.trim()">{{ searching ? '搜索中' : httpUrl(query.trim()) ? '解析' : '搜索' }}</button>
-      </form><UiSelect class="online-engine" :model-value="onlineSearchSettings.provider" :options="searchEngineOptions" label="搜索引擎" :disabled="busy" @update:model-value="onlineSearchSettings.provider = $event as SearchEngine" /><label v-if="!catalog" class="online-search-options"><input v-model="onlineSearchSettings.novelOnly" type="checkbox" :disabled="busy" />仅看小说</label></div>
-      <input v-if="onlineSearchSettings.provider === 'brave'" ref="apiKeyInput" v-model="onlineSearchSettings.apiKey" class="online-api-key" type="password" autocomplete="off" aria-label="Brave Search API 密钥" placeholder="Brave Search API 密钥" />
+        <input v-model="query" :aria-label="t('search.hint.simple')" :placeholder="t('search.placeholder.books')" :disabled="busy" />
+        <button v-if="query && !busy" type="button" class="clear-search" :title="t('common.clear')" :aria-label="t('search.clear')" @click="clear"><X :size="16" /></button>
+        <button type="submit" class="primary-command" :disabled="busy || !query.trim()">{{ searching ? t('common.searching') : httpUrl(query.trim()) ? t('parse.action') : t('nav.search') }}</button>
+      </form><UiSelect class="online-engine" :model-value="onlineSearchSettings.provider" :options="engineOptions" :label="t('search.engine')" :disabled="busy" @update:model-value="onlineSearchSettings.provider = $event as SearchEngine" /><label v-if="!catalog" class="online-search-options"><input v-model="onlineSearchSettings.novelOnly" type="checkbox" :disabled="busy" />{{ t('library.filter.novelsOnly') }}</label></div>
+      <input v-if="onlineSearchSettings.provider === 'brave'" ref="apiKeyInput" v-model="onlineSearchSettings.apiKey" class="online-api-key" type="password" autocomplete="off" :aria-label="t('search.braveApiKey')" :placeholder="t('search.braveApiKey')" />
 
 
       <section v-if="catalog" class="online-book">
-        <button type="button" class="text-command online-back" @click="returnToResults"><ArrowLeft :size="14" />{{ hits.length ? '返回搜索结果' : '返回找书' }}</button>
+        <button type="button" class="text-command online-back" @click="returnToResults"><ArrowLeft :size="14" />{{ hits.length ? t('search.back') : t('online.back') }}</button>
         <div class="online-book-heading">
           <div class="online-cover">{{ catalog.title.slice(0, 1) }}</div>
-          <div class="online-book-copy"><div class="online-book-title"><h2>{{ catalog.title }}</h2><button v-if="!activeDiscovery?.state.bookId" type="button" class="icon-button online-edit" aria-label="编辑书籍信息" title="编辑书籍信息" @click="editMetadata"><Pencil :size="13" /></button></div><p>{{ [catalog.author, `${catalog.chapters.length}${catalog.complete === false ? '+' : ''} 章`, hostname(catalog.catalogUrl)].filter(Boolean).join(' · ') }}</p></div>
-          <button type="button" class="icon-button" title="打开来源网页" aria-label="打开来源网页" @click="external(catalog.catalogUrl)"><ArrowUpRight :size="18" /></button>
+          <div class="online-book-copy"><div class="online-book-title"><h2>{{ catalog.title }}</h2><button v-if="!activeDiscovery?.state.bookId" type="button" class="icon-button online-edit" :aria-label="t('library.info.edit')" :title="t('library.info.edit')" @click="editMetadata"><Pencil :size="13" /></button></div><p>{{ [catalog.author, `${catalog.chapters.length}${catalog.complete === false ? '+' : ''} 章`, hostname(catalog.catalogUrl)].filter(Boolean).join(' · ') }}</p></div>
+          <button type="button" class="icon-button" :title="t('online.source.open')" :aria-label="t('online.source.open')" @click="external(catalog.catalogUrl)"><ArrowUpRight :size="18" /></button>
         </div>
         <p v-if="description" class="online-description">{{ description }}</p>
-        <div v-if="parsing" class="online-catalog-progress" role="status"><RefreshCw :size="13" class="spinning" />{{ parseStatus }}<button type="button" class="text-command" @click="cancelParse">停止解析</button><button v-if="parseVerification" type="button" class="text-command" @click="action(() => showOnlineVerification(parseVerification!.requestId))">打开验证窗口</button></div>
-        <p v-if="catalog.warnings.length" class="online-book-hint">{{ catalog.chapters.length === 1 ? '仅识别到当前章节' : catalog.warnings.join('；') }}</p>
-        <div class="online-book-actions"><button type="button" class="primary-command" :disabled="busy || !catalog.title.trim()" @click="start(true)"><BookOpen :size="16" />开始阅读</button><button type="button" class="secondary-command" :disabled="busy || !catalog.title.trim()" @click="start(false)"><Download :size="16" />下载到书架</button></div>
-        <details class="online-directory"><summary>章节目录 <span>{{ catalog.chapters.length }}</span></summary><ol><li v-for="(chapter, index) in catalog.chapters" :key="chapter.url"><button type="button" :disabled="starting" @click="start(true, index + 1)">{{ chapter.title }}</button></li></ol></details>
+        <div v-if="parsing" class="online-catalog-progress" role="status"><RefreshCw :size="13" class="spinning" />{{ parseStatus }}<button type="button" class="text-command" @click="cancelParse">{{ t('parse.stop') }}</button><button v-if="parseVerification" type="button" class="text-command" @click="action(() => showOnlineVerification(parseVerification!.requestId))">{{ t('browser.verify.open') }}</button></div>
+        <p v-if="catalog.warnings.length" class="online-book-hint">{{ catalog.chapters.length === 1 ? t('parse.onlyCurrentChapter') : catalog.warnings.join('；') }}</p>
+        <div class="online-book-actions"><button type="button" class="primary-command" :disabled="busy || !catalog.title.trim()" @click="start(true)"><BookOpen :size="16" />{{ t('library.startReading') }}</button><button type="button" class="secondary-command" :disabled="busy || !catalog.title.trim()" @click="start(false)"><Download :size="16" />{{ t('downloads.toShelf') }}</button></div>
+        <details class="online-directory"><summary>{{ t('contents.chapterList') }} <span>{{ catalog.chapters.length }}</span></summary><ol><li v-for="(chapter, index) in catalog.chapters" :key="chapter.url"><button type="button" :disabled="starting" @click="start(true, index + 1)">{{ chapter.title }}</button></li></ol></details>
       </section>
 
-      <OnlineSearchLoading v-else-if="searching || loadingMore" class="online-results" :label="browserConfirmation ? '请在网页窗口完成确认' : loadingMore ? `正在加载第 ${onlineSearchSession.page + 1} 页` : '正在搜索'" :cancellable="searchingWithBrowser" @cancel="action(cancelBrowserSearch)" />
-      <section v-else-if="hits.length || (searched && hasNextPage)" class="online-results" aria-label="网络搜索结果">
-        <header class="search-result-heading"><span>本页 {{ hits.length }} 条结果</span><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSession.engine, onlineSearchSession.submittedQuery))">在浏览器中搜索<ArrowUpRight :size="13" /></button></header>
-        <div v-if="pageError" class="online-page-error" role="alert"><span>{{ pageError }}</span><button type="button" class="text-command" :disabled="busy" @click="changePage(onlineSearchSession.page + 1)">重试</button></div>
-        <div v-if="!hits.length" class="online-no-matches"><span>{{ onlineSearchSettings.novelOnly ? '本页暂无小说结果' : '本页暂无结果' }}</span><button v-if="onlineSearchSettings.novelOnly" type="button" class="text-command" @click="onlineSearchSettings.novelOnly = false">显示全部结果</button></div>
+      <OnlineSearchLoading v-else-if="searching || loadingMore" class="online-results" :label="browserConfirmation ? t('browser.verify.confirm') : loadingMore ? `正在加载第 ${onlineSearchSession.page + 1} 页` : t('search.loading')" :cancellable="searchingWithBrowser" @cancel="action(cancelBrowserSearch)" />
+      <section v-else-if="hits.length || (searched && hasNextPage)" class="online-results" :aria-label="t('search.webResults')">
+        <header class="search-result-heading"><span>{{ t('unit.resultsPage', { count: hits.length }) }}</span><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSession.engine, onlineSearchSession.submittedQuery))">{{ t('search.inBrowser') }}<ArrowUpRight :size="13" /></button></header>
+        <div v-if="pageError" class="online-page-error" role="alert"><span>{{ pageError }}</span><button type="button" class="text-command" :disabled="busy" @click="changePage(onlineSearchSession.page + 1)">{{ t('common.retry') }}</button></div>
+        <div v-if="!hits.length" class="online-no-matches"><span>{{ onlineSearchSettings.novelOnly ? t('search.pageEmptyNovels') : t('search.pageEmpty') }}</span><button v-if="onlineSearchSettings.novelOnly" type="button" class="text-command" @click="onlineSearchSettings.novelOnly = false">{{ t('search.showAll') }}</button></div>
         <article v-for="(hit, index) in hits" :key="`${index}:${hit.url}`" class="online-result" :class="{ 'is-parsing': parsing && selectedUrl === hit.url }" :aria-busy="parsing && selectedUrl === hit.url">
           <button type="button" class="online-result-copy" :disabled="busy" @click="isNovelSearchHit(hit) ? analyze(hit.url) : external(hit.url)"><small>{{ hostname(hit.url) }}</small><strong :title="hit.title">{{ hit.title }}</strong><p v-if="hit.description">{{ hit.description }}</p></button>
-          <div class="online-result-actions"><button v-if="isNovelSearchHit(hit)" type="button" class="secondary-command online-read-action" :disabled="busy || (parsing && selectedUrl === hit.url)" :title="onlineSearchSession.failures[hit.url]" @click="analyze(hit.url)"><RefreshCw v-if="parsing && selectedUrl === hit.url" :size="14" class="spinning" />{{ parsing && selectedUrl === hit.url ? '解析中' : onlineSearchSession.failures[hit.url] ? '重试' : '阅读' }}</button>
-          <button type="button" class="secondary-command online-view-page" title="查看原网页" aria-label="查看原网页" @click="external(hit.url)">查看网页</button>
+          <div class="online-result-actions"><button v-if="isNovelSearchHit(hit)" type="button" class="secondary-command online-read-action" :disabled="busy || (parsing && selectedUrl === hit.url)" :title="onlineSearchSession.failures[hit.url]" @click="analyze(hit.url)"><RefreshCw v-if="parsing && selectedUrl === hit.url" :size="14" class="spinning" />{{ parsing && selectedUrl === hit.url ? t('parse.running') : onlineSearchSession.failures[hit.url] ? t('common.retry') : t('library.read') }}</button>
+          <button type="button" class="secondary-command online-view-page" :title="t('online.source.openOriginal')" :aria-label="t('online.source.openOriginal')" @click="external(hit.url)">{{ t('online.source.view') }}</button>
           </div>
         </article>
       </section>
-      <div v-else-if="searchError && !busy" class="online-search-error" role="alert"><p>{{ searchError }}</p><div><button v-if="onlineSearchSettings.provider !== 'brave'" type="button" class="text-command" @click="submit(true)">打开搜索窗口<ArrowUpRight :size="13" /></button><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSettings.provider, query))">在浏览器中搜索<ArrowUpRight :size="13" /></button></div></div>
-      <div v-else-if="searched && !busy" class="search-empty" role="status">{{ onlineSearchSettings.novelOnly ? '没有找到小说结果' : '没有找到相关来源' }}<button v-if="onlineSearchSettings.novelOnly" type="button" class="text-command" @click="onlineSearchSettings.novelOnly = false">显示全部结果</button><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSettings.provider, query))">在浏览器中搜索<ArrowUpRight :size="13" /></button></div>
+      <div v-else-if="searchError && !busy" class="online-search-error" role="alert"><p>{{ searchError }}</p><div><button v-if="onlineSearchSettings.provider !== 'brave'" type="button" class="text-command" @click="submit(true)">{{ t('search.openWindow') }}<ArrowUpRight :size="13" /></button><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSettings.provider, query))">{{ t('search.inBrowser') }}<ArrowUpRight :size="13" /></button></div></div>
+      <div v-else-if="searched && !busy" class="search-empty" role="status">{{ onlineSearchSettings.novelOnly ? t('search.noNovels') : t('search.noSources') }}<button v-if="onlineSearchSettings.novelOnly" type="button" class="text-command" @click="onlineSearchSettings.novelOnly = false">{{ t('search.showAll') }}</button><button type="button" class="text-command" @click="external(searchBrowserUrl(onlineSearchSettings.provider, query))">{{ t('search.inBrowser') }}<ArrowUpRight :size="13" /></button></div>
       <OnlineSearchEmpty v-else-if="!parsing && !searching && !catalog && !hits.length" :recent="onlineSearchSession.recent" @search="query = $event; submit()" @remove="onlineSearchSession.recent = onlineSearchSession.recent.filter(query => query !== $event)" @clear="onlineSearchSession.recent = []" />
-      <nav v-if="!catalog && !searching && resultPages.length && (searched || loadingMore)" class="online-pagination" :aria-busy="loadingMore" aria-label="搜索结果分页"><button type="button" class="secondary-command" :disabled="busy || onlineSearchSession.page === 1" @click="changePage(onlineSearchSession.page - 1)"><ChevronLeft :size="14" />上一页</button><template v-for="(number, index) in pageNumbers" :key="index"><button v-if="number" type="button" class="online-page-number" :aria-label="`第 ${number} 页`" :aria-current="number === onlineSearchSession.page ? 'page' : undefined" :disabled="busy" @click="changePage(number)">{{ number }}</button><span v-else aria-hidden="true">…</span></template><button type="button" class="secondary-command" :disabled="busy || !hasNextPage" @click="changePage(onlineSearchSession.page + 1)">下一页<ChevronRight :size="14" /></button></nav>
+      <nav v-if="!catalog && !searching && resultPages.length && (searched || loadingMore)" class="online-pagination" :aria-busy="loadingMore" :aria-label="t('search.pagination')"><button type="button" class="secondary-command" :disabled="busy || onlineSearchSession.page === 1" @click="changePage(onlineSearchSession.page - 1)"><ChevronLeft :size="14" />{{ t('common.previousPage') }}</button><template v-for="(number, index) in pageNumbers" :key="index"><button v-if="number" type="button" class="online-page-number" :aria-label="`第 ${number} 页`" :aria-current="number === onlineSearchSession.page ? 'page' : undefined" :disabled="busy" @click="changePage(number)">{{ number }}</button><span v-else aria-hidden="true">…</span></template><button type="button" class="secondary-command" :disabled="busy || !hasNextPage" @click="changePage(onlineSearchSession.page + 1)">{{ t('common.nextPage') }}<ChevronRight :size="14" /></button></nav>
     </div>
 
     <div v-else class="online-task-list">
       <div v-if="visibleTasks.length" class="online-task-toolbar">
-        <div class="online-task-filters" role="group" aria-label="筛选下载任务">
-          <button type="button" :aria-pressed="taskFilter === 'all'" @click="taskFilter = 'all'">全部 <span>{{ visibleTasks.length }}</span></button>
-          <button type="button" :aria-pressed="taskFilter === 'active'" @click="taskFilter = 'active'">下载中</button>
-          <button type="button" :aria-pressed="taskFilter === 'paused'" @click="taskFilter = 'paused'">已暂停</button>
-          <button type="button" :aria-pressed="taskFilter === 'complete'" @click="taskFilter = 'complete'">已完成</button>
+        <div class="online-task-filters" role="group" :aria-label="t('downloads.filter')">
+          <button type="button" :aria-pressed="taskFilter === 'all'" @click="taskFilter = 'all'">{{ t('common.all') }} <span>{{ visibleTasks.length }}</span></button>
+          <button type="button" :aria-pressed="taskFilter === 'active'" @click="taskFilter = 'active'">{{ t('downloads.downloading') }}</button>
+          <button type="button" :aria-pressed="taskFilter === 'paused'" @click="taskFilter = 'paused'">{{ t('common.paused') }}</button>
+          <button type="button" :aria-pressed="taskFilter === 'complete'" @click="taskFilter = 'complete'">{{ t('common.finished') }}</button>
         </div>
-        <button type="button" class="text-command" :disabled="!completedCount || clearing" @click="clearCompleted"><Trash2 :size="13" />清除已完成</button>
+        <button type="button" class="text-command" :disabled="!completedCount || clearing" @click="clearCompleted"><Trash2 :size="13" />{{ t('downloads.clearDone') }}</button>
       </div>
-      <div v-if="!taskBooks.length" class="search-empty" role="status">{{ taskFilter === 'active' && visibleTasks.length ? '暂无进行中的下载' : taskFilter === 'paused' && visibleTasks.length ? '暂无已暂停任务' : taskFilter === 'complete' && visibleTasks.length ? '暂无已完成任务' : '暂无下载任务' }}</div>
+      <div v-if="!taskBooks.length" class="search-empty" role="status">{{ taskFilter === 'active' && visibleTasks.length ? t('downloads.emptyActive') : taskFilter === 'paused' && visibleTasks.length ? t('downloads.emptyPaused') : taskFilter === 'complete' && visibleTasks.length ? t('downloads.emptyDone') : t('downloads.empty') }}</div>
       <article v-for="book in taskBooks" :key="book.bookId" class="online-task">
-        <button type="button" class="online-task-cover" :aria-label="`阅读《${book.title}》`" @click="router.push(`/book/${book.bookId}`)">{{ book.title.slice(0, 1) }}</button>
+        <button type="button" class="online-task-cover" :aria-label="t('library.read.title', { title: book.title })" @click="router.push(`/book/${book.bookId}`)">{{ book.title.slice(0, 1) }}</button>
         <div class="online-task-body">
-          <div class="online-task-title"><button type="button" class="online-task-book" @click="router.push(`/book/${book.bookId}`)">{{ book.title }}</button><span :class="{ 'is-active': book.state === 'downloading', 'is-complete': cached(book.bookId) === book.chapters.length && book.catalogComplete !== false }">{{ book.catalogComplete === false && ['idle', 'downloading', 'failed'].includes(book.state) ? book.error ? '目录未完整' : '目录整理中' : labels[book.state] || book.state }}</span></div>
-          <div class="online-task-progress"><progress :value="cached(book.bookId)" :max="book.chapters.length" :aria-label="`${book.title}下载进度`" /><small>{{ cached(book.bookId) }} / {{ book.chapters.length }} 章</small></div>
+          <div class="online-task-title"><button type="button" class="online-task-book" @click="router.push(`/book/${book.bookId}`)">{{ book.title }}</button><span :class="{ 'is-active': book.state === 'downloading', 'is-complete': cached(book.bookId) === book.chapters.length && book.catalogComplete !== false }">{{ book.catalogComplete === false && ['idle', 'downloading', 'failed'].includes(book.state) ? book.error ? t('online.contents.incomplete') : t('online.contents.organizing') : labels[book.state] || book.state }}</span></div>
+          <div class="online-task-progress"><progress :value="cached(book.bookId)" :max="book.chapters.length" :aria-label="`${book.title}下载进度`" /><small>{{ cached(book.bookId) }} / {{ book.chapters.length }} {{ t('unit.chaptersShort') }}</small></div>
           <button type="button" class="online-task-source" @click="external(book.catalogUrl)">{{ hostname(book.catalogUrl) }}<ArrowUpRight :size="11" /></button>
-          <details v-if="book.error || book.chapters.some(c => c.status === 'failed')" class="online-failures"><summary>查看未完成原因</summary><p v-if="book.error">{{ book.error }}</p><p v-for="chapter in book.chapters.filter(c => c.status === 'failed')" :key="chapter.number">{{ chapter.title }}：{{ chapter.error }}</p></details>
+          <details v-if="book.error || book.chapters.some(c => c.status === 'failed')" class="online-failures"><summary>{{ t('downloads.viewReason') }}</summary><p v-if="book.error">{{ book.error }}</p><p v-for="chapter in book.chapters.filter(c => c.status === 'failed')" :key="chapter.number">{{ chapter.title }}：{{ chapter.error }}</p></details>
         </div>
         <div class="online-task-actions">
-          <button type="button" class="secondary-command" @click="router.push(`/book/${book.bookId}`)"><BookOpen :size="15" />阅读</button>
-          <button v-if="book.state === 'downloading'" type="button" class="icon-button" title="暂停下载" aria-label="暂停下载" @click="action(() => pauseOnlineBook(book.bookId))"><Pause :size="16" /></button>
-          <button v-else-if="cached(book.bookId) < book.chapters.length || book.catalogComplete === false" type="button" class="secondary-command" @click="action(() => downloadOnlineBook(book.bookId))"><Play :size="14" />{{ book.state === 'failed' ? '重试' : book.state === 'idle' ? '下载' : '继续' }}</button>
+          <button type="button" class="secondary-command" @click="router.push(`/book/${book.bookId}`)"><BookOpen :size="15" />{{ t('library.read') }}</button>
+          <button v-if="book.state === 'downloading'" type="button" class="icon-button" :title="t('downloads.pause')" :aria-label="t('downloads.pause')" @click="action(() => pauseOnlineBook(book.bookId))"><Pause :size="16" /></button>
+          <button v-else-if="cached(book.bookId) < book.chapters.length || book.catalogComplete === false" type="button" class="secondary-command" @click="action(() => downloadOnlineBook(book.bookId))"><Play :size="14" />{{ book.state === 'failed' ? t('common.retry') : book.state === 'idle' ? t('downloads.action') : t('common.continue') }}</button>
           <details class="online-task-menu" @keydown.esc="($event.currentTarget as HTMLDetailsElement).open = false">
-            <summary aria-label="更多任务操作" title="更多任务操作"><MoreHorizontal :size="18" /></summary>
+            <summary :aria-label="t('downloads.more')" :title="t('downloads.more')"><MoreHorizontal :size="18" /></summary>
             <div>
-              <button type="button" :disabled="Boolean(checking) || book.state === 'downloading'" @click="closeMenu($event); check(book.bookId)"><RefreshCw :size="14" />检查更新</button>
-              <label class="online-follow"><input type="checkbox" :checked="book.autoUpdate" @change="action(() => toggleOnlineUpdates(book.bookId, ($event.target as HTMLInputElement).checked))" />自动追更</label>
-              <button v-if="book.state === 'downloading' || book.state === 'paused'" type="button" @click="closeMenu($event); action(() => pauseOnlineBook(book.bookId, true))"><X :size="14" />取消下载</button>
+              <button type="button" :disabled="Boolean(checking) || book.state === 'downloading'" @click="closeMenu($event); check(book.bookId)"><RefreshCw :size="14" />{{ t('update.check') }}</button>
+              <label class="online-follow"><input type="checkbox" :checked="book.autoUpdate" @change="action(() => toggleOnlineUpdates(book.bookId, ($event.target as HTMLInputElement).checked))" />{{ t('online.autoFollow') }}</label>
+              <button v-if="book.state === 'downloading' || book.state === 'paused'" type="button" @click="closeMenu($event); action(() => pauseOnlineBook(book.bookId, true))"><X :size="14" />{{ t('downloads.cancel') }}</button>
               <hr />
-              <button type="button" @click="removeTask(book, $event)">移除任务</button>
-              <button type="button" class="online-delete" @click="closeMenu($event); pendingDelete = book"><Trash2 :size="14" />删除书籍</button>
+              <button type="button" @click="removeTask(book, $event)">{{ t('common.removeTask') }}</button>
+              <button type="button" class="online-delete" @click="closeMenu($event); pendingDelete = book"><Trash2 :size="14" />{{ t('library.delete.action') }}</button>
             </div>
           </details>
         </div>
@@ -425,11 +428,11 @@ onBeforeUnmount(() => { alive = false; popupListeners.forEach(unlisten => unlist
 
     <Teleport to="body">
       <dialog ref="metadataDialog" class="ui-dialog online-metadata-dialog">
-        <form @submit.prevent="saveMetadata"><header><h2>书籍信息</h2><button type="button" class="icon-button" aria-label="关闭书籍信息" @click="metadataDialog?.close()"><X :size="16" /></button></header><label for="online-book-title">书名</label><input id="online-book-title" v-model="metadataTitle" autocomplete="off" required /><label for="online-book-author">作者</label><input id="online-book-author" v-model="metadataAuthor" autocomplete="off" /><footer class="ui-dialog-actions"><button type="button" class="secondary-command" @click="metadataDialog?.close()">取消</button><button type="submit" class="primary-command" :disabled="!metadataTitle.trim()">保存</button></footer></form>
+        <form @submit.prevent="saveMetadata"><header><h2>{{ t('library.info.title') }}</h2><button type="button" class="icon-button" :aria-label="t('library.info.close')" @click="metadataDialog?.close()"><X :size="16" /></button></header><label for="online-book-title">{{ t('library.field.title') }}</label><input id="online-book-title" v-model="metadataTitle" autocomplete="off" required /><label for="online-book-author">{{ t('library.field.author') }}</label><input id="online-book-author" v-model="metadataAuthor" autocomplete="off" /><footer class="ui-dialog-actions"><button type="button" class="secondary-command" @click="metadataDialog?.close()">{{ t('common.cancel') }}</button><button type="submit" class="primary-command" :disabled="!metadataTitle.trim()">{{ t('common.save') }}</button></footer></form>
       </dialog>
     </Teleport>
-    <UiDialog v-if="!isTauri()" :open="parsePopupVisible" title="正在解析" @close="cancelParse"><div class="online-parse-site" role="status"><RefreshCw :size="18" class="spinning" /><div><strong>{{ activeDiscovery ? hostname(activeDiscovery.url) : '' }}</strong><span>{{ parseStatus }}</span></div></div><div class="online-parse-track"><span /></div><footer class="ui-dialog-actions"><button type="button" class="secondary-command" @click="cancelParse">取消</button></footer></UiDialog>
-    <UiConfirmDialog :open="Boolean(pendingDelete)" :busy="deleting" danger title="删除这本书？" :description="`《${pendingDelete?.title || ''}》的本地正文、阅读进度和下载任务将一起删除。`" confirm-label="删除书籍" @close="pendingDelete = undefined" @confirm="deleteBook" />
+    <UiDialog v-if="!isTauri()" :open="parsePopupVisible" :title="t('parse.runningLong')" @close="cancelParse"><div class="online-parse-site" role="status"><RefreshCw :size="18" class="spinning" /><div><strong>{{ activeDiscovery ? hostname(activeDiscovery.url) : '' }}</strong><span>{{ parseStatus }}</span></div></div><div class="online-parse-track"><span /></div><footer class="ui-dialog-actions"><button type="button" class="secondary-command" @click="cancelParse">{{ t('common.cancel') }}</button></footer></UiDialog>
+    <UiConfirmDialog :open="Boolean(pendingDelete)" :busy="deleting" danger :title="t('library.delete.confirmTitle')" :description="`《${pendingDelete?.title || ''}》的本地正文、阅读进度和下载任务将一起删除。`" :confirm-label="t('library.delete.action')" @close="pendingDelete = undefined" @confirm="deleteBook" />
   </section>
 </template>
 

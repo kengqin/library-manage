@@ -1,6 +1,7 @@
 import { getVersion } from '@tauri-apps/api/app'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { t } from '@novel-library/i18n/vue'
 import { reactive, ref, toRefs } from 'vue'
 import { relaunch } from '@tauri-apps/plugin-process'
 import localManifest from '../../../../releases/releases.json'
@@ -148,15 +149,15 @@ function errorDetail(cause: unknown) {
 
 function userMessageFor(stage: UpdateStage) {
   const messages: Partial<Record<UpdateStage, string>> = {
-    'manifest-error': '暂时无法连接更新服务，请稍后重试',
-    'published-but-not-ready': '发现新版本，安装包正在准备',
-    'version-mismatch': '更新信息尚未同步完成，请稍后重试',
-    'signature-error': '更新包校验失败，已阻止安装',
-    'download-error': '下载失败，可重试或打开历史版本页面',
-    'install-error': '更新包已下载，但安装失败，可重新安装',
-    'relaunch-error': '更新已安装，请手动重启应用'
+    'manifest-error': t('update.serviceUnavailable'),
+    'published-but-not-ready': t('update.foundPreparing'),
+    'version-mismatch': t('update.infoSyncing'),
+    'signature-error': t('update.verifyFailed'),
+    'download-error': t('downloads.failed'),
+    'install-error': t('update.installFailedRetry'),
+    'relaunch-error': t('update.installedManualRestart')
   }
-  return messages[stage] || '更新操作失败，请稍后重试'
+  return messages[stage] || t('update.actionFailed')
 }
 
 function setFailure(stage: UpdateStage) {
@@ -217,7 +218,7 @@ export function configureBackgroundUpdateChecks() {
 function parseSemver(value: string) {
   const normalized = value.replace(/^v/, '')
   const match = normalized.match(SEMVER_PATTERN)
-  if (!match) throw new Error(`无效版本号：${value}`)
+  if (!match) throw new Error(t('update.invalidVersion', { value }))
   return {
     core: match.slice(1, 4).map(Number),
     prerelease: match[4]?.split('.') || []
@@ -262,7 +263,7 @@ export function isReleaseManifest(value: unknown): value is ReleaseManifest {
     try {
       parseSemver(release.version)
       if (release.minimumSupportedVersion !== undefined) parseSemver(release.minimumSupportedVersion)
-      else if (release.version === manifest.latest) throw new Error('最新版本缺少直接升级基线')
+      else if (release.version === manifest.latest) throw new Error(t('update.noBaseline'))
     } catch {
       return false
     }
@@ -307,8 +308,8 @@ async function fetchRemoteReleaseManifest(): Promise<ReleaseManifestResult> {
   const response = await fetch(RELEASE_HISTORY_URL, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const manifest: unknown = await response.json()
-  if (!isReleaseManifest(manifest)) throw new Error('版本清单格式无效')
-  if (compareVersions(manifest.latest, localManifest.latest) < 0) throw new Error('版本清单尚未同步到当前应用版本')
+  if (!isReleaseManifest(manifest)) throw new Error(t('update.manifestInvalid'))
+  if (compareVersions(manifest.latest, localManifest.latest) < 0) throw new Error(t('update.manifestStale'))
   writeManifestCache(manifest)
   return { manifest, remote: true, source: 'remote' }
 }
@@ -352,8 +353,8 @@ function applyNativeUpdateState(snapshot: NativeUpdateState) {
   latestReadyVersion.value = snapshot.update?.version || latestReadyVersion.value
   updateRequiresBackup.value = Boolean(targetRelease?.requiresBackup)
   updateCompatibilityNote.value = targetRelease?.minimumSupportedVersion && snapshot.update && compareVersions(snapshot.update.currentVersion, targetRelease.minimumSupportedVersion) < 0
-    ? `当前版本低于直接升级基线 v${targetRelease.minimumSupportedVersion}，建议先导出完整备份。`
-    : targetRelease?.requiresBackup ? '此版本升级前需要先导出完整备份。' : ''
+    ? t('update.belowBaseline', { version: targetRelease.minimumSupportedVersion })
+    : targetRelease?.requiresBackup ? t('update.backupRequired') : ''
   updateTask.stage = snapshot.stage
   updateTask.version = snapshot.update?.version || ''
   updateTask.downloadedBytes = snapshot.downloadedBytes
@@ -361,8 +362,8 @@ function applyNativeUpdateState(snapshot: NativeUpdateState) {
   updateTask.progress = ['downloaded', 'installing', 'installed', 'install-error'].includes(snapshot.stage) ? 100
     : snapshot.totalBytes > 0 ? Math.min(100, Math.round(snapshot.downloadedBytes / snapshot.totalBytes * 100)) : 0
   updateTask.error = snapshot.error ? userMessageFor(snapshot.stage) : ''
-  updateTask.message = snapshot.message || (snapshot.stage === 'available' ? `发现新版本 ${snapshot.update?.version || ''}`
-    : snapshot.stage === 'downloading' ? `正在下载 v${snapshot.update?.version || ''}` : '')
+  updateTask.message = snapshot.message || (snapshot.stage === 'available' ? t('update.found', { version: snapshot.update?.version || '' })
+    : snapshot.stage === 'downloading' ? t('update.downloading', { version: snapshot.update?.version || '' }) : '')
 }
 
 export async function synchronizeUpdateTask() {
@@ -390,7 +391,7 @@ export async function checkForUpdates(silent = false) {
   if (updateChecking.value || updateBusy()) return availableUpdate.value
   updateChecking.value = true
   updateTask.error = ''
-  if (!silent) updateTask.message = '正在检查更新...'
+  if (!silent) updateTask.message = t('update.checking')
   let detectedVersion: string | null = null
   try {
     await initializeUpdateEvents()
@@ -411,7 +412,7 @@ export async function checkForUpdates(silent = false) {
       updateRequiresBackup.value = false
       updateCompatibilityNote.value = ''
       updateTask.stage = 'idle'
-      updateTask.message = '当前已是最新版本'
+      updateTask.message = t('update.latestShort')
       return null
     }
 
@@ -425,15 +426,15 @@ export async function checkForUpdates(silent = false) {
     targetRelease = manifest.releases.find((release) => release.version === update.version) || null
     updateRequiresBackup.value = Boolean(targetRelease?.requiresBackup)
     updateCompatibilityNote.value = targetRelease?.minimumSupportedVersion && compareVersions(currentVersion, targetRelease.minimumSupportedVersion) < 0
-      ? `当前版本低于直接升级基线 v${targetRelease.minimumSupportedVersion}，建议先导出完整备份。`
+      ? t('update.belowBaseline', { version: targetRelease.minimumSupportedVersion })
       : targetRelease?.requiresBackup
-        ? '此版本升级前需要先导出完整备份。'
+        ? t('update.backupRequired')
         : ''
 
     const readyUpdate = update as AvailableUpdate
     availableUpdate.value = readyUpdate
     updateTask.stage = 'available'
-    updateTask.message = `发现新版本 ${readyUpdate.version}`
+    updateTask.message = t('update.found', { version: readyUpdate.version })
     updateTask.error = ''
     if (silent && !updatePromptDismissed.value && ignoredUpdateVersion.value !== readyUpdate.version) {
       await openUpdateWindow(false).catch(() => {})
@@ -479,7 +480,7 @@ export async function downloadAvailableUpdate(automatic = false, backupConfirmed
     updateTask.downloadedBytes = 0
     updateTask.totalBytes = 0
     updateTask.error = ''
-    updateTask.message = `正在下载 v${availableUpdate.value.version}`
+    updateTask.message = t('update.downloading', { version: availableUpdate.value.version })
     try {
       await invoke<boolean>('download_application_update')
       await synchronizeUpdateTask()
@@ -495,7 +496,7 @@ export async function downloadAvailableUpdate(automatic = false, backupConfirmed
 export async function cancelUpdateDownload() {
   if (updateTask.stage !== 'downloading') return
   updateTask.stage = 'cancelling'
-  updateTask.message = '正在取消下载...'
+  updateTask.message = t('downloads.cancelling')
   try {
     await invoke<boolean>('cancel_application_update_download')
     await synchronizeUpdateTask()
@@ -508,12 +509,12 @@ export async function installDownloadedUpdate() {
   if (!['downloaded', 'install-error'].includes(updateTask.stage)) return
   updateTask.stage = 'installing'
   updateTask.error = ''
-  updateTask.message = '正在安装更新...'
+  updateTask.message = t('update.installing')
   try {
     await invoke('install_downloaded_application_update')
   } catch {
     setFailure('install-error')
-    updateTask.message = '更新已下载，可重新安装'
+    updateTask.message = t('update.downloadedReinstall')
     return
   }
   updateTask.stage = 'installed'
@@ -522,7 +523,7 @@ export async function installDownloadedUpdate() {
 
 export async function restartAfterUpdate() {
   if (!['installed', 'relaunch-error'].includes(updateTask.stage)) return
-  updateTask.message = '安装完成，正在重启...'
+  updateTask.message = t('update.installRestarting')
   try {
     await relaunch()
   } catch {

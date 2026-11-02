@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, Globe2, RefreshCw, X } from 'lucide-vue-next'
 import { closeBrowserTab, selectBrowserTab, webBrowser, type WebBrowserTab } from '../services/web-browser'
@@ -24,15 +25,15 @@ function scroll(amount: number) { viewport.value?.scrollBy({ left: amount, behav
 function wheel(event: WheelEvent) { if (overflowing.value) { event.preventDefault(); scroll(Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY) } }
 async function choose(tab: WebBrowserTab) {
   if (tab.id === webBrowser.value.activeTab) { emit('edit'); return }
-  try { await selectBrowserTab(tab.id) } catch (cause) { showGlobalError(cause, '网页切换失败') }
+  try { await selectBrowserTab(tab.id) } catch (cause) { showGlobalError(cause, t('browser.switchFailed')) }
 }
-async function close(id: number) { try { await closeBrowserTab(id) } catch (cause) { showGlobalError(cause, '网页关闭失败') } }
+async function close(id: number) { try { await closeBrowserTab(id) } catch (cause) { showGlobalError(cause, t('browser.closeFailed')) } }
 function keys(event: KeyboardEvent) {
   if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
   event.preventDefault()
   const index = tabs.value.findIndex(tab => tab.id === webBrowser.value.activeTab)
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.value.length-1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.value.length) % tabs.value.length
-  const tab = tabs.value[next]; if (tab) void selectBrowserTab(tab.id).catch(cause => showGlobalError(cause, '网页切换失败'))
+  const tab = tabs.value[next]; if (tab) void selectBrowserTab(tab.id).catch(cause => showGlobalError(cause, t('browser.switchFailed')))
 }
 watch([() => webBrowser.value.activeTab, () => tabs.value.length, () => props.compact], async () => {
   await nextTick(); layout(); await nextTick()
@@ -43,17 +44,17 @@ onBeforeUnmount(() => observer?.disconnect())
 </script>
 <template>
   <div ref="root" class="browser-tabs" :class="{ 'has-overflow': overflowing, 'is-compact': compact, 'is-condensed': width < 72 }" :style="{ flexBasis: `${tabs.length * maximum}px`, '--browser-tab-width': `${width}px`, '--browser-tab-max': `${maximum}px` }" @wheel="wheel">
-    <button v-if="overflowing" type="button" class="browser-tabs-arrow" aria-label="向左滚动标签" :disabled="!left" @click="scroll(-120)"><ChevronLeft :size="13" /></button>
-    <div ref="viewport" class="browser-tabs-viewport" role="tablist" aria-label="网页标签" @scroll="edges" @keydown="keys">
+    <button v-if="overflowing" type="button" class="browser-tabs-arrow" :aria-label="t('browser.tabs.scrollLeft')" :disabled="!left" @click="scroll(-120)"><ChevronLeft :size="13" /></button>
+    <div ref="viewport" class="browser-tabs-viewport" role="tablist" :aria-label="t('browser.tabs')" @scroll="edges" @keydown="keys">
       <div v-for="tab in tabs" :key="tab.id" class="browser-tab" :class="{ 'is-active': tab.id === webBrowser.activeTab }" :data-tab-id="tab.id" :title="title(tab)" data-tooltip-variant="page-title" @click="choose(tab)">
         <RefreshCw v-if="tab.loading" :size="14" class="spinning" />
         <img v-else-if="tab.favicon && failedIcons[tab.id] !== tab.favicon" :src="tab.favicon" alt="" draggable="false" referrerpolicy="no-referrer" @error="failedIcons[tab.id] = tab.favicon" />
         <Globe2 v-else :size="14" />
         <button type="button" class="browser-tab-title" role="tab" :aria-label="title(tab)" :aria-selected="tab.id === webBrowser.activeTab" :tabindex="tab.id === webBrowser.activeTab ? 0 : -1" @click.stop="choose(tab)">{{ title(tab) }}</button>
-        <button type="button" class="browser-tab-close" :aria-label="tab.id === webBrowser.activeTab ? '关闭网页' : `关闭网页：${title(tab)}`" title="关闭网页" @click.stop="close(tab.id)"><X :size="11" /></button>
+        <button type="button" class="browser-tab-close" :aria-label="tab.id === webBrowser.activeTab ? t('browser.close') : `关闭网页：${title(tab)}`" :title="t('browser.close')" @click.stop="close(tab.id)"><X :size="11" /></button>
       </div>
     </div>
-    <button v-if="overflowing" type="button" class="browser-tabs-arrow" aria-label="向右滚动标签" :disabled="!right" @click="scroll(120)"><ChevronRight :size="13" /></button>
+    <button v-if="overflowing" type="button" class="browser-tabs-arrow" :aria-label="t('browser.tabs.scrollRight')" :disabled="!right" @click="scroll(120)"><ChevronRight :size="13" /></button>
   </div>
 </template>
 <style scoped>

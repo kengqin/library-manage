@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -19,7 +20,7 @@ async function choose(behavior: Exclude<CloseBehavior, 'ask'>) {
     await resolveCloseBehavior(behavior, remember.value)
     visible.value = false
   } catch (cause) {
-    showGlobalError(cause, '关闭窗口方式保存失败，请稍后重试')
+    showGlobalError(cause, t('window.closeBehavior.saveFailed'))
   } finally {
     busy.value = false
   }
@@ -31,7 +32,7 @@ async function cancel() {
     await cancelCloseBehaviorPrompt()
     visible.value = false
   } catch (cause) {
-    showGlobalError(cause, '暂时无法取消关闭，请稍后重试')
+    showGlobalError(cause, t('window.closeBehavior.cancelFailed'))
   }
 }
 
@@ -61,14 +62,14 @@ onBeforeUnmount(() => {
     <div v-if="visible" class="close-dialog-backdrop" role="presentation">
       <section ref="dialog" class="close-dialog" role="dialog" aria-modal="true" aria-labelledby="close-dialog-title" tabindex="-1">
         <header>
-          <h2 id="close-dialog-title">关闭窗口后要做什么？</h2>
-          <button type="button" class="icon-button" title="取消关闭" :disabled="busy" @click="cancel"><X :size="20" /></button>
+          <h2 id="close-dialog-title">{{ t('window.closeBehavior.dialogTitle') }}</h2>
+          <button type="button" class="icon-button" :title="t('window.closeBehavior.cancel')" :disabled="busy" @click="cancel"><X :size="20" /></button>
         </header>
-        <p>缩小到托盘后，IDE 插件仍可正常同步；直接退出后，需要重新打开 library-manage 才能继续同步。</p>
-        <label class="remember-close-choice"><input v-model="remember" type="checkbox" /><span>记住我的选择，下次不再询问</span></label>
+        <p>{{ t('window.trayHint') }}</p>
+        <label class="remember-close-choice"><input v-model="remember" type="checkbox" /><span>{{ t('window.closeBehavior.remember') }}</span></label>
         <footer>
-          <button type="button" class="secondary-command danger-command" :disabled="busy" @click="choose('quit')">直接退出</button>
-          <button type="button" class="primary-command" :disabled="busy" @click="choose('minimizeToTray')">缩小到托盘</button>
+          <button type="button" class="secondary-command danger-command" :disabled="busy" @click="choose('quit')">{{ t('window.closeBehavior.quit') }}</button>
+          <button type="button" class="primary-command" :disabled="busy" @click="choose('minimizeToTray')">{{ t('window.closeBehavior.tray') }}</button>
         </footer>
       </section>
     </div>

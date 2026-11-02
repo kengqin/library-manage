@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { App as NativeApp } from '@capacitor/app'
@@ -30,10 +31,10 @@ onBeforeUnmount(() => void backListener?.remove())
 <template>
   <div class="mobile-shell" :class="{ 'mobile-shell--reader': reader }">
     <RouterView />
-    <nav v-if="!reader" class="tabbar" aria-label="主导航">
-      <RouterLink to="/library" :class="{ active: route.path.startsWith('/library') || route.path.startsWith('/book/') }"><BookOpen :size="20" /><span>书架</span></RouterLink>
-      <RouterLink to="/search" :class="{ active: route.path.startsWith('/search') }"><Search :size="20" /><span>搜索</span></RouterLink>
-      <RouterLink to="/settings" :class="{ active: route.path.startsWith('/settings') }"><Settings :size="20" /><span>设置</span></RouterLink>
+    <nav v-if="!reader" class="tabbar" :aria-label="t('app.navigation.main')">
+      <RouterLink to="/library" :class="{ active: route.path.startsWith('/library') || route.path.startsWith('/book/') }"><BookOpen :size="20" /><span>{{ t('nav.shelf') }}</span></RouterLink>
+      <RouterLink to="/search" :class="{ active: route.path.startsWith('/search') }"><Search :size="20" /><span>{{ t('nav.search') }}</span></RouterLink>
+      <RouterLink to="/settings" :class="{ active: route.path.startsWith('/settings') }"><Settings :size="20" /><span>{{ t('app.settings.title') }}</span></RouterLink>
     </nav>
   </div>
 </template>

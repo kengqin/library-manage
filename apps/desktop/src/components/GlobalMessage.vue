@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { AlertTriangle, CheckCircle2, CircleAlert, Info, X } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -42,7 +43,7 @@ onBeforeUnmount(() => unlisten?.())
           <Info v-else :size="17" />
         </span>
         <span class="global-message__content">{{ globalMessage.text }}</span>
-        <button type="button" aria-label="关闭提示" @click="close">
+        <button type="button" :aria-label="t('common.dismiss')" @click="close">
           <X :size="16" />
         </button>
       </div>

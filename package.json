@@ -1,6 +1,6 @@
 {
   "name": "library-manage",
-  "version": "0.7.6",
+  "version": "0.8.0",
   "description": "",
   "main": "index.js",
   "private": true,
@@ -34,7 +34,8 @@
     "release:validate": "node scripts/validate-release.mjs",
     "release:manifest": "node scripts/release/build-target-manifest.mjs",
     "release:verify": "node scripts/release/verify-published-release.mjs",
-    "test": "vitest run && node --test plugins/vscode/bridge.node-test.mjs plugins/vscode/import-selection.test.mjs plugins/vscode/wheel-bridge.test.mjs && node scripts/validate-desktop-feedback.mjs",
+    "test": "vitest run && node --test plugins/vscode/bridge.node-test.mjs plugins/vscode/import-selection.test.mjs plugins/vscode/wheel-bridge.test.mjs && node scripts/validate-desktop-feedback.mjs && node scripts/validate-i18n.mjs",
+    "i18n:check": "node scripts/validate-i18n.mjs",
     "desktop:feedback:validate": "node scripts/validate-desktop-feedback.mjs",
     "plugins:validate": "node scripts/validate-ide-integrations.mjs",
     "runtime:test": "cargo test --manifest-path apps/local-runtime/Cargo.toml",

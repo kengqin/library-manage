@@ -123,6 +123,8 @@ input::placeholder { color: var(--ui-text-3); opacity: 1; }
   height: var(--window-titlebar-height);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* 窗口按钮固定跟随系统习惯待在右上角，不随 RTL 语言翻转 */
+  direction: ltr;
   color: var(--ui-text-2);
   background: var(--ui-titlebar-background);
   border: 0;

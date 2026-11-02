@@ -1,3 +1,4 @@
+import { t } from '@novel-library/i18n/vue'
 import { reactive, ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { discoverCatalog, extractChapter, type DiscoveryProgress, type OnlineCatalog } from './online-parser'
@@ -100,7 +101,7 @@ export async function ensureOnlineChapter(bookId: string, number: number, priori
   }
   const task: ChapterTask = { bookId, priority, done: Promise.resolve() }
   const fetchChapterPage = (url: string) => {
-    if (task.priority === 'background' && stopped.has(bookId)) return Promise.reject(new DOMException('下载已暂停', 'AbortError'))
+    if (task.priority === 'background' && stopped.has(bookId)) return Promise.reject(new DOMException(t('downloads.paused'), 'AbortError'))
     return requests.run(url, () => fetchOnlinePageWithVerification(url), { priority: task.priority, group: task })
   }
   task.done = (async () => {
@@ -144,12 +145,12 @@ export function downloadOnlineBook(bookId: string): Promise<void> {
   const work = (async () => {
     await setState(bookId, { status: 'downloading', error: '', taskVisible: true })
     let book = onlineBooks.value.find(b => b.bookId === bookId)
-    if (!book) throw new Error('在线书籍已删除')
+    if (!book) throw new Error(t('online.bookDeleted'))
     if (book.catalogComplete === false) {
       const { ensureCatalogComplete } = await import('./online-discovery')
       await ensureCatalogComplete(bookId)
       book = onlineBooks.value.find(b => b.bookId === bookId)
-      if (!book || book.catalogComplete === false) throw new Error('目录尚未完整，已保留现有章节，请重试检查更新')
+      if (!book || book.catalogComplete === false) throw new Error(t('online.contents.incompleteKept'))
     }
     let consecutiveFailures = 0
     for (const chapter of book.chapters) {
@@ -160,7 +161,7 @@ export function downloadOnlineBook(bookId: string): Promise<void> {
         if (cause instanceof DOMException && cause.name === 'AbortError') {
           if (!stopped.has(bookId)) {
             stopped.add(bookId)
-            await setState(bookId, { status: 'paused', error: '网页验证未完成，可继续下载重试' })
+            await setState(bookId, { status: 'paused', error: t('browser.verify.incomplete') })
           }
           return
         }
@@ -172,7 +173,7 @@ export function downloadOnlineBook(bookId: string): Promise<void> {
     const latest = (await refreshOnlineBooks()).find(b => b.bookId === bookId)
     if (!latest) return
     const complete = latest.chapters.every(c => c.status === 'cached')
-    await setState(bookId, { status: complete ? 'complete' : 'failed', error: complete ? '' : '部分章节未完成，可重试失败章节；连续失败时任务会停止。' })
+    await setState(bookId, { status: complete ? 'complete' : 'failed', error: complete ? '' : t('downloads.partialFailed') })
   })().catch(async cause => { if (!stopped.has(bookId)) await setState(bookId, { status: 'failed', error: message(cause) }) }).finally(() => runners.delete(bookId))
   runners.set(bookId, work)
   return work
@@ -213,14 +214,14 @@ async function cancelUpdateCheck(bookId: string) {
 }
 
 export function checkOnlineUpdates(bookId: string): Promise<number> {
-  if (checksInFlight.has(bookId)) return Promise.reject(new Error('这本书正在检查更新'))
-  if (runners.has(bookId)) return Promise.reject(new Error('当前章节仍在处理中，请稍后检查更新'))
+  if (checksInFlight.has(bookId)) return Promise.reject(new Error(t('online.book.checking')))
+  if (runners.has(bookId)) return Promise.reject(new Error(t('online.book.processing')))
   const controller = new AbortController()
   const work = (async () => {
     const book = onlineBooks.value.find(b => b.bookId === bookId)
-    if (!book) throw new Error('在线书籍不存在')
+    if (!book) throw new Error(t('online.bookNotFound'))
     const catalog = await discoverCatalog(book.catalogUrl, url => fetchOnlinePage(url, controller.signal))
-    if (controller.signal.aborted) throw new DOMException('更新检查已取消', 'AbortError')
+    if (controller.signal.aborted) throw new DOMException(t('update.checkCancelled'), 'AbortError')
     // Keep the canonical identity, even when the source redirects its directory.
     catalog.catalogUrl = book.catalogUrl
     const count = book.chapters.length

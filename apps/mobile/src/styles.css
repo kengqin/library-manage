@@ -63,6 +63,9 @@ button:disabled { cursor:default; opacity:.45; }
 .settings-section>button span,.setting-card div { display:grid; gap:4px; }
 .settings-section small,.setting-card p { color:#82978c; font-size:12px; }
 .settings-section .danger-setting { color:#ffc0ba; border-color:#593732; }
+.language-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.language-choices>button { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; border:1px solid #29473b; border-radius:14px; padding:11px 14px; color:#b9cec3; background:#14231f; font-size:13px; }
+.language-choices>button.active { color:#eafff6; border-color:#4f9c7f; background:#1d3a30; font-weight:600; }
 .tabbar { position:fixed; z-index:20; right:18px; bottom:max(14px,env(safe-area-inset-bottom)); left:18px; display:grid; grid-template-columns:repeat(3,1fr); max-width:724px; margin:auto; padding:8px; border:1px solid #29473b; border-radius:20px; background:#14231ff2; box-shadow:0 14px 35px #0007; backdrop-filter:blur(18px); }
 .tabbar a { display:grid; justify-items:center; gap:4px; border-radius:14px; padding:9px 5px; color:#779083; font-size:11px; text-decoration:none; }
 .tabbar a.active { color:#d5f0df; background:#2b4c3d; }

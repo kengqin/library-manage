@@ -8,8 +8,12 @@ import { syncApplicationWindowChrome } from './services/window-chrome'
 import { initializeTooltips } from './services/tooltips'
 import { initializeScrollbars } from './services/scrollbars'
 import { PAGE_TURN_DURATION, startPageTurn } from './services/startup-animation'
+import { initializeLocale } from '@novel-library/i18n/vue'
 import './styles.css'
 import './styles/editorial.css'
+
+// 语言必须在挂载前确定，避免先渲染中文再闪烁成译文
+initializeLocale()
 
 window.addEventListener('contextmenu', event => event.preventDefault(), true)
 

@@ -1,3 +1,4 @@
+import { locale, t } from '@novel-library/i18n/vue'
 import { readonly, ref } from 'vue'
 
 export type GlobalMessageType = 'success' | 'info' | 'warning' | 'error'
@@ -33,12 +34,16 @@ export function showGlobalMessage(text: string, type: GlobalMessageType = 'succe
   }
 }
 
-export function userFacingError(cause: unknown, fallback = '操作未完成，请稍后重试') {
+export function userFacingError(cause: unknown, fallback = t('common.actionIncomplete')) {
   const raw = (cause instanceof Error ? cause.message : String(cause)).trim()
   const firstLine = raw.split(/\r?\n/u, 1)[0].replace(/^Error:\s*/iu, '').trim()
-  return /[\u3400-\u9fff]/u.test(firstLine) && firstLine.length <= 160 ? firstLine : fallback
+  // 中文界面只透出中文原因；其它语言界面直接展示原文（底层报错多为英文工具链输出）
+  const chineseReason = /[\u3400-\u9fff]/u.test(firstLine)
+  const chineseUi = locale.value.startsWith('zh')
+  const readable = chineseReason ? chineseUi : !chineseUi
+  return readable && firstLine.length <= 160 ? firstLine : fallback
 }
 
-export function showGlobalError(cause: unknown, fallback = '操作未完成，请稍后重试', duration = 6000) {
+export function showGlobalError(cause: unknown, fallback = t('common.actionIncomplete'), duration = 6000) {
   showGlobalMessage(userFacingError(cause, fallback), 'error', duration)
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Eye, List, Minus, Plus, Settings2, X } from 'lucide-vue-next'
 import { readerFonts, readerWidths, type ReaderWidth, type ReaderFont, type ReaderPalette } from '../services/reader-appearance'
@@ -60,44 +61,44 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', dismissOutside
 
 <template>
   <div ref="dock" class="reader-settings-dock" @keydown="handleKeydown" @focusout="handleFocusout">
-    <section v-if="open" id="reader-settings-panel" ref="panel" class="reader-settings-panel" role="dialog" aria-label="阅读设置" tabindex="-1">
-      <header><strong>阅读设置</strong><button type="button" class="reader-settings-close" aria-label="关闭阅读设置" @click="close(true)"><X :size="15" /></button></header>
+    <section v-if="open" id="reader-settings-panel" ref="panel" class="reader-settings-panel" role="dialog" :aria-label="t('reader.settings')" tabindex="-1">
+      <header><strong>{{ t('reader.settings') }}</strong><button type="button" class="reader-settings-close" :aria-label="t('reader.settings.close')" @click="close(true)"><X :size="15" /></button></header>
       <div class="reader-setting-row">
-        <span id="reader-family-label">字体</span>
+        <span id="reader-family-label">{{ t('reader.typography.fontFamily') }}</span>
         <div class="reader-setting-segments" role="group" aria-labelledby="reader-family-label">
           <button v-for="(item, key) in readerFonts" :key="key" type="button" :aria-pressed="font === key" :style="{ fontFamily: item.family }" @click="font = key">{{ item.label }}</button>
         </div>
       </div>
       <div class="reader-setting-row">
-        <span id="reader-font-label">字号</span>
+        <span id="reader-font-label">{{ t('reader.typography.fontSize') }}</span>
         <div class="reader-setting-stepper" role="group" aria-labelledby="reader-font-label">
-          <button type="button" aria-label="减小字号" :disabled="fontSize <= 15" @click="fontSize = Math.max(15, fontSize - 1)"><Minus :size="14" /></button>
+          <button type="button" :aria-label="t('reader.fontSize.decrease')" :disabled="fontSize <= 15" @click="fontSize = Math.max(15, fontSize - 1)"><Minus :size="14" /></button>
           <output aria-live="polite">{{ fontSize }}</output>
-          <button type="button" aria-label="增大字号" :disabled="fontSize >= 26" @click="fontSize = Math.min(26, fontSize + 1)"><Plus :size="14" /></button>
+          <button type="button" :aria-label="t('reader.fontSize.increase')" :disabled="fontSize >= 26" @click="fontSize = Math.min(26, fontSize + 1)"><Plus :size="14" /></button>
         </div>
       </div>
       <div class="reader-setting-row">
-        <span id="reader-spacing-label">行距</span>
+        <span id="reader-spacing-label">{{ t('reader.typography.lineHeight') }}</span>
         <div class="reader-setting-segments" role="group" aria-labelledby="reader-spacing-label">
-          <button v-for="item in ([['紧', 1.8], ['中', 2.05], ['松', 2.3]] as const)" :key="item[0]" type="button" :aria-pressed="lineHeight === item[1]" @click="lineHeight = item[1]">{{ item[0] }}</button>
+          <button v-for="item in ([[t('reader.lineHeight.tight'), 1.8], [t('library.size.medium'), 2.05], [t('reader.lineHeight.loose'), 2.3]] as const)" :key="item[0]" type="button" :aria-pressed="lineHeight === item[1]" @click="lineHeight = item[1]">{{ item[0] }}</button>
         </div>
       </div>
       <div class="reader-setting-row">
-        <span id="reader-palette-label">纸张</span>
+        <span id="reader-palette-label">{{ t('reader.theme.paperShort') }}</span>
         <div class="reader-setting-segments" role="group" aria-labelledby="reader-palette-label">
-          <button v-for="item in ([['light', '白色'], ['paper', '纸色'], ['ivory', '米白'], ['night', '夜间']] as const)" :key="item[0]" type="button" :aria-pressed="palette === item[0]" @click="palette = item[0]">{{ item[1] }}</button>
+          <button v-for="item in ([['light', t('reader.theme.white')], ['paper', t('reader.theme.paper')], ['ivory', t('reader.theme.ivory')], ['night', t('reader.theme.night')]] as const)" :key="item[0]" type="button" :aria-pressed="palette === item[0]" @click="palette = item[0]">{{ item[1] }}</button>
         </div>
       </div>
       <div class="reader-setting-row reader-setting-row--width">
-        <span id="reader-width-label">页面宽度</span>
+        <span id="reader-width-label">{{ t('reader.pageWidth') }}</span>
         <div class="reader-setting-segments" role="group" aria-labelledby="reader-width-label">
-          <button v-for="width in readerWidths" :key="width" type="button" :aria-pressed="pageWidth === width" @click="pageWidth = width">{{ width === 'auto' ? '自动' : width }}</button>
+          <button v-for="width in readerWidths" :key="width" type="button" :aria-pressed="pageWidth === width" @click="pageWidth = width">{{ width === 'auto' ? t('common.auto') : width }}</button>
         </div>
       </div>
     </section>
-    <button type="button" class="reader-settings-trigger" title="目录" aria-label="目录" aria-haspopup="dialog" @click="openCatalogue"><List :size="19" /></button>
-    <button type="button" class="reader-settings-trigger reader-privacy-trigger" title="进入隐私模式" aria-label="进入隐私模式" @click="enterPrivacy"><Eye :size="19" /></button>
-    <button ref="trigger" type="button" class="reader-settings-trigger" title="阅读设置" aria-label="阅读设置" aria-haspopup="dialog" aria-controls="reader-settings-panel" :aria-expanded="open" @click="toggle"><Settings2 :size="19" /></button>
+    <button type="button" class="reader-settings-trigger" :title="t('contents.title')" :aria-label="t('contents.title')" aria-haspopup="dialog" @click="openCatalogue"><List :size="19" /></button>
+    <button type="button" class="reader-settings-trigger reader-privacy-trigger" :title="t('app.privacyMode.enter')" :aria-label="t('app.privacyMode.enter')" @click="enterPrivacy"><Eye :size="19" /></button>
+    <button ref="trigger" type="button" class="reader-settings-trigger" :title="t('reader.settings')" :aria-label="t('reader.settings')" aria-haspopup="dialog" aria-controls="reader-settings-panel" :aria-expanded="open" @click="toggle"><Settings2 :size="19" /></button>
   </div>
 </template>
 

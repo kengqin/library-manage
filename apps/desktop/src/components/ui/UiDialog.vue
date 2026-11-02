@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t } from '@novel-library/i18n/vue'
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 const props = defineProps<{ open: boolean; title: string }>()
@@ -14,7 +15,7 @@ onBeforeUnmount(() => dialog.value?.close())
 <template>
   <Teleport to="body">
     <dialog ref="dialog" class="ui-dialog ui-content-dialog" :aria-labelledby="titleId" @cancel.prevent="emit('close')" @close="open && emit('close')" @click.self="emit('close')">
-      <header class="ui-content-dialog-header"><h2 :id="titleId">{{ title }}</h2><button type="button" class="icon-button" aria-label="关闭弹框" @click="emit('close')"><X :size="17" /></button></header>
+      <header class="ui-content-dialog-header"><h2 :id="titleId">{{ title }}</h2><button type="button" class="icon-button" :aria-label="t('common.closeDialog')" @click="emit('close')"><X :size="17" /></button></header>
       <div class="ui-content-dialog-body"><slot v-if="open" /></div>
     </dialog>
   </Teleport>
