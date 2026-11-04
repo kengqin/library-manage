@@ -23,7 +23,7 @@ use models::{
     NoteRecord, NoteSummary, NotesTransferResult, SaveImportedBookInput, SaveNoteInput,
     SaveProgressInput, SavedBookResult, StorageStatus,
 };
-use tauri::{AppHandle, Manager, State};
+use tauri::{Manager, State};
 use updater::UpdateDownloadState;
 
 pub(crate) fn background_ui_test() -> bool {
@@ -43,25 +43,6 @@ pub(crate) fn show_auxiliary_window(window: &tauri::Window) -> Result<(), String
         window.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
-}
-
-/// 允许「先隐藏、等前端画好再显示」的辅助窗口。
-pub(crate) const AUXILIARY_WINDOW_LABELS: [&str; 3] = ["settings", "release-history", "app-update"];
-
-/// 兜底：前端脚本若因异常没能发出显示信号，1.2 秒后强制显示窗口。
-///
-/// 取固定时长而不是 `page_load`，是因为页面加载本身可能很慢（冷启动、dev 编译），
-/// 那样反而把「点了没反应」的时间拉得更长。正常路径通常在 100ms 内完成，兜底不会触发。
-pub(crate) fn schedule_auxiliary_fallback(app: &AppHandle, label: &'static str) {
-    let handle = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(1200));
-        if let Some(window) = handle.get_window(label) {
-            if !window.is_visible().unwrap_or(false) {
-                let _ = show_auxiliary_window(&window);
-            }
-        }
-    });
 }
 
 #[cfg(windows)]
@@ -104,11 +85,92 @@ fn installation_directory() -> Result<PathBuf, String> {
         .map_err(|error| error.to_string())?
         .parent()
         .map(PathBuf::from)
-        .ok_or_else(|| "无法定位 NovelLibrary 安装目录".to_string())
+        .ok_or_else(|| "无法定位 library-manage 安装目录".to_string())
 }
 
 fn default_data_directory(install_directory: &Path) -> Result<PathBuf, String> {
     Ok(install_directory.join("NovelLibraryData"))
+}
+
+/// 改名前的产品名。旧版本把书库放在安装目录下的 `NovelLibraryData`，
+/// 产品名变更后默认安装目录随之改变，需要按旧线索把原书库找回来。
+const PREVIOUS_PRODUCT_NAME: &str = "NovelLibrary";
+const DATA_DIRECTORY_NAME: &str = "NovelLibraryData";
+
+fn data_directory_holds_library(directory: &Path) -> bool {
+    directory.join("library.db").is_file()
+}
+
+#[cfg(windows)]
+fn previous_install_location() -> Option<PathBuf> {
+    use winreg::{
+        enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ},
+        RegKey,
+    };
+
+    let uninstall = r"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+    for root in [
+        RegKey::predef(HKEY_CURRENT_USER),
+        RegKey::predef(HKEY_LOCAL_MACHINE),
+    ] {
+        let Ok(key) = root.open_subkey_with_flags(uninstall, KEY_READ) else {
+            continue;
+        };
+        for name in key.enum_keys().flatten() {
+            let Ok(entry) = key.open_subkey_with_flags(&name, KEY_READ) else {
+                continue;
+            };
+            let Ok(display_name) = entry.get_value::<String, _>("DisplayName") else {
+                continue;
+            };
+            if display_name.trim() != PREVIOUS_PRODUCT_NAME {
+                continue;
+            }
+            let Ok(location) = entry.get_value::<String, _>("InstallLocation") else {
+                continue;
+            };
+            let location = PathBuf::from(location.trim().trim_matches('"'));
+            if location.is_dir() {
+                return Some(location);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(windows))]
+fn previous_install_location() -> Option<PathBuf> {
+    None
+}
+
+fn previous_data_directory_candidates(install_directory: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(parent) = install_directory.parent() {
+        candidates.push(parent.join(PREVIOUS_PRODUCT_NAME).join(DATA_DIRECTORY_NAME));
+    }
+    if let Some(location) = previous_install_location() {
+        candidates.push(location.join(DATA_DIRECTORY_NAME));
+        candidates.push(location);
+    }
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let root = PathBuf::from(local_app_data).join(PREVIOUS_PRODUCT_NAME);
+        candidates.push(root.join(DATA_DIRECTORY_NAME));
+        candidates.push(root);
+    }
+    candidates
+}
+
+/// 产品名由 NovelLibrary 改为 library-manage 后安装目录随之改变，旧书库仍在原处。
+/// 默认位置没有书库时，按旧安装目录找回并**原地沿用**，不复制也不移动文件，
+/// 避免在升级时动到用户的真实书库。
+fn adopt_previous_data_directory(install_directory: &Path, default: PathBuf) -> PathBuf {
+    if data_directory_holds_library(&default) {
+        return default;
+    }
+    previous_data_directory_candidates(install_directory)
+        .into_iter()
+        .find(|candidate| *candidate != default && data_directory_holds_library(candidate))
+        .unwrap_or(default)
 }
 
 #[tauri::command]
@@ -440,9 +502,13 @@ pub fn run() {
                 .then(|| std::env::var_os("NOVEL_LIBRARY_TEST_DATA_DIRECTORY"))
                 .flatten()
                 .map(PathBuf::from);
-            let data_directory = isolated
-                .clone()
-                .unwrap_or(default_data_directory(&install_directory)?);
+            let data_directory = match isolated.clone() {
+                Some(directory) => directory,
+                None => adopt_previous_data_directory(
+                    &install_directory,
+                    default_data_directory(&install_directory)?,
+                ),
+            };
             let old_settings = legacy_directory.join("app-settings.json");
             let new_settings = data_directory.join("app-settings.json");
             if isolated.is_none() && !new_settings.exists() && old_settings.is_file() {
@@ -487,12 +553,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| {
-            // 辅助窗口在内容渲染完成后自行请求显示，任何窗口都能调用（命令内部有白名单）
-            if invoke.message.command() == "reveal_auxiliary_window" {
-                let ready_handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
-                    tauri::generate_handler![settings_window::reveal_auxiliary_window];
-                return ready_handler(invoke);
-            }
             if floating_layer::is_layer(invoke.message.webview_ref().label()) {
                 let layer_handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![floating_layer::get_floating_layer, floating_layer::resize_floating_layer, floating_layer::hide_floating_layer];
                 return layer_handler(invoke);
@@ -526,7 +586,6 @@ pub fn run() {
                 settings_window::open_settings_window,
                 settings_window::open_application_update_window,
                 settings_window::open_release_history_window,
-                settings_window::prepare_auxiliary_windows,
                 web_browser::set_web_browser_suspended,
                 web_browser::open_web_browser,
                 web_browser::get_web_browser_state,
@@ -610,7 +669,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::default_data_directory;
+    use super::{adopt_previous_data_directory, default_data_directory};
     use std::path::PathBuf;
 
     #[test]
@@ -620,5 +679,48 @@ mod tests {
             default_data_directory(&install_directory).expect("default data path"),
             PathBuf::from(r"D:\Software\NovelLibrary\NovelLibraryData")
         );
+    }
+
+    fn temp_root(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "library-manage-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("temp root");
+        root
+    }
+
+    #[test]
+    fn keeps_default_data_directory_when_it_already_holds_a_library() {
+        let root = temp_root("keeps-default");
+        let install_directory = root.join("library-manage");
+        let data_directory = install_directory.join("NovelLibraryData");
+        std::fs::create_dir_all(&data_directory).expect("data directory");
+        std::fs::write(data_directory.join("library.db"), b"current").expect("current library");
+        let previous = root.join("NovelLibrary").join("NovelLibraryData");
+        std::fs::create_dir_all(&previous).expect("previous data directory");
+        std::fs::write(previous.join("library.db"), b"previous").expect("previous library");
+
+        let resolved = adopt_previous_data_directory(&install_directory, data_directory.clone());
+
+        assert_eq!(resolved, data_directory);
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn adopts_the_library_left_by_the_previous_product_name() {
+        let root = temp_root("adopts-previous");
+        let install_directory = root.join("library-manage");
+        let data_directory = install_directory.join("NovelLibraryData");
+        std::fs::create_dir_all(&data_directory).expect("data directory");
+        let previous = root.join("NovelLibrary").join("NovelLibraryData");
+        std::fs::create_dir_all(&previous).expect("previous data directory");
+        std::fs::write(previous.join("library.db"), b"previous").expect("previous library");
+
+        let resolved = adopt_previous_data_directory(&install_directory, data_directory);
+
+        assert_eq!(resolved, previous);
+        std::fs::remove_dir_all(&root).ok();
     }
 }
