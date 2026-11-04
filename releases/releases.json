@@ -1,8 +1,44 @@
 {
   "schemaVersion": 1,
   "repository": "kengqin/library-manage",
-  "latest": "0.9.0",
+  "latest": "0.10.0",
   "releases": [
+    {
+      "version": "0.10.0",
+      "date": "2026-11-04",
+      "title": "安装包更名为 library-manage，撤销窗口预创建",
+      "channel": "stable",
+      "databaseSchema": 6,
+      "published": true,
+      "minimumSupportedVersion": "0.6.20",
+      "requiresBackup": false,
+      "releaseUrl": "https://github.com/kengqin/library-manage/releases/tag/v0.10.0",
+      "installerUrl": "https://github.com/kengqin/library-manage/releases/download/v0.10.0/library-manage_0.10.0_x64-setup.exe",
+      "sha256": "",
+      "sections": [
+        {
+          "title": "变更",
+          "items": [
+            "产品名由 NovelLibrary 改为 library-manage：安装包、默认安装目录、开始菜单文件夹、桌面快捷方式与卸载项显示名统一，安装包变为 library-manage_0.10.0_x64-setup.exe",
+            "升级时按旧卸载记录与原安装目录找回旧书库，原地沿用，不复制、不移动、不删除任何文件"
+          ]
+        },
+        {
+          "title": "修复",
+          "items": [
+            "撤销 0.9.0 的辅助窗口后台预创建：预创建窗口加载完前端后会自行请求显示，导致启动后设置、软件更新、更新历史主动弹出",
+            "窗口恢复为点开时创建并立即显示，更新历史仍浮在设置窗口之上",
+            "启动时不再创建任何后台窗口，WebView 进程数回到单窗口水平"
+          ]
+        }
+      ],
+      "upgradeNotes": [
+        "数据库 Schema 保持为 6，书库、阅读进度、笔记、在线缓存与个人设置无需迁移",
+        "安装目录默认值随产品名变化，应用会自动沿用旧书库目录，但不会替你搬动文件",
+        "先确认新版能正常打开原书库，再卸载旧版；旧版卸载器会删除它自己的安装目录，其中包含 NovelLibraryData",
+        "界面语言手动选择与外观偏好按产品名分开存放，升级后可能回到自动判定，重新设置一次即可"
+      ]
+    },
     {
       "version": "0.9.0",
       "date": "2026-11-04",
