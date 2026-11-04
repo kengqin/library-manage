@@ -24,6 +24,7 @@ const LOCALE_NAMES = {
   'it-IT': '意大利文',
   'pt-BR': '葡萄牙文（巴西）',
   'ru-RU': '俄文',
+  'th-TH': '泰文',
   'tr-TR': '土耳其文',
   'pl-PL': '波兰文',
   'cs-CZ': '捷克文',

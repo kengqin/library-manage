@@ -23,7 +23,7 @@ use models::{
     NoteRecord, NoteSummary, NotesTransferResult, SaveImportedBookInput, SaveNoteInput,
     SaveProgressInput, SavedBookResult, StorageStatus,
 };
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 use updater::UpdateDownloadState;
 
 pub(crate) fn background_ui_test() -> bool {
@@ -43,6 +43,25 @@ pub(crate) fn show_auxiliary_window(window: &tauri::Window) -> Result<(), String
         window.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// 允许「先隐藏、等前端画好再显示」的辅助窗口。
+pub(crate) const AUXILIARY_WINDOW_LABELS: [&str; 3] = ["settings", "release-history", "app-update"];
+
+/// 兜底：前端脚本若因异常没能发出显示信号，1.2 秒后强制显示窗口。
+///
+/// 取固定时长而不是 `page_load`，是因为页面加载本身可能很慢（冷启动、dev 编译），
+/// 那样反而把「点了没反应」的时间拉得更长。正常路径通常在 100ms 内完成，兜底不会触发。
+pub(crate) fn schedule_auxiliary_fallback(app: &AppHandle, label: &'static str) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        if let Some(window) = handle.get_window(label) {
+            if !window.is_visible().unwrap_or(false) {
+                let _ = show_auxiliary_window(&window);
+            }
+        }
+    });
 }
 
 #[cfg(windows)]
@@ -468,6 +487,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| {
+            // 辅助窗口在内容渲染完成后自行请求显示，任何窗口都能调用（命令内部有白名单）
+            if invoke.message.command() == "reveal_auxiliary_window" {
+                let ready_handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
+                    tauri::generate_handler![settings_window::reveal_auxiliary_window];
+                return ready_handler(invoke);
+            }
             if floating_layer::is_layer(invoke.message.webview_ref().label()) {
                 let layer_handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![floating_layer::get_floating_layer, floating_layer::resize_floating_layer, floating_layer::hide_floating_layer];
                 return layer_handler(invoke);
@@ -501,6 +526,7 @@ pub fn run() {
                 settings_window::open_settings_window,
                 settings_window::open_application_update_window,
                 settings_window::open_release_history_window,
+                settings_window::prepare_auxiliary_windows,
                 web_browser::set_web_browser_suspended,
                 web_browser::open_web_browser,
                 web_browser::get_web_browser_state,
