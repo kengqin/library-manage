@@ -3,18 +3,20 @@
  *
  * 语言选择持久化在 localStorage，桌面端多窗口（主窗口、设置窗口、浏览器窗口）
  * 通过 storage 事件保持同步；<html lang> 跟随切换，方便 CSS 与无障碍读屏。
+ * 首次启动没有保存过选择时，按「系统语言 → 本机时区 → 中文」自动判定。
  */
 import { computed, readonly, ref } from 'vue'
 import {
   DEFAULT_LOCALE,
   LOCALE_STORAGE_KEY,
   SUPPORTED_LOCALES,
-  detectLocale,
   localeLabel,
   localeDirection,
   normalizeLocale,
+  resolveLocale,
   translate,
   type Locale,
+  type LocaleDetectionInput,
   type LocaleOption,
   type MessageKey,
   type TranslateParams
@@ -27,6 +29,39 @@ let storageBound = false
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof document !== 'undefined'
+}
+
+/**
+ * 收集本机语言与时区线索，作为「系统语言 → 时区 → 中文」判定的输入。
+ *
+ * 每一步都单独包 try：`navigator` 被裁掉、`Intl` 不可用、时区为 `undefined`
+ * 都只意味着少一条线索，函数本身永远返回一个对象，绝不抛错。
+ * 语言线索顺序即优先级：系统/浏览器语言偏好 → 旧 Edge 的 `userLanguage`
+ * → `Intl` 的默认 locale（Firefox 装语言包时它与系统区域不一致，仅作兜底）。
+ */
+function readSystemHints(): LocaleDetectionInput {
+  if (!isBrowser()) return {}
+  const languages: string[] = []
+  try {
+    const navigator = window.navigator
+    if (Array.isArray(navigator?.languages)) {
+      for (const language of navigator.languages) if (language) languages.push(language)
+    }
+    if (navigator?.language) languages.push(navigator.language)
+    const legacy = (navigator as Navigator & { userLanguage?: string })?.userLanguage
+    if (legacy) languages.push(legacy)
+  } catch {
+    // 某些隐私模式下读取 navigator 会抛错，当作没有语言线索
+  }
+  let timeZone: string | undefined
+  try {
+    const resolved = new Intl.DateTimeFormat().resolvedOptions()
+    timeZone = resolved.timeZone
+    if (resolved.locale) languages.push(resolved.locale)
+  } catch {
+    // Intl 被裁剪或时区无法解析，当作没有时区线索
+  }
+  return { languages, timeZone }
 }
 
 function readStoredLocale(): Locale | undefined {
@@ -71,17 +106,27 @@ function bindStorageSync() {
 
 /**
  * 应用启动时调用（桌面端在 main.ts，Web 端在挂载后）。
- * 没有保存过选择时按浏览器语言推断并落盘，保证下次启动稳定。
+ *
+ * 已有保存的选择 → 直接用；没有则按「系统语言 → 本机时区 → 中文」判定
+ * （见 `resolveLocale`），并把结果落盘，保证下次启动与其它窗口稳定一致。
+ * 原生壳（Tauri / Capacitor）能拿到更准的系统语言时，可通过 `systemLanguages`
+ * 传入，排在浏览器线索之前；两者都取不到时同样稳定回退到中文。
  */
-export function initializeLocale(): Locale {
+export function initializeLocale(options: { systemLanguages?: readonly string[] } = {}): Locale {
   if (!isBrowser()) return state.value
   const stored = readStoredLocale()
   if (stored) {
     state.value = stored
   } else {
-    const detected = detectLocale(window.navigator?.languages ?? (window.navigator?.language ? [window.navigator.language] : []))
-    state.value = detected
-    persistLocale(detected)
+    const hints = readSystemHints()
+    const detected = resolveLocale({
+      languages: [...(options.systemLanguages ?? []), ...(hints.languages ?? [])],
+      timeZone: hints.timeZone
+    })
+    state.value = detected.locale
+    persistLocale(detected.locale)
+    // 便于排查「界面为什么是这门语言」：system-language / time-zone / fallback
+    document.documentElement.dataset.localeSource = detected.reason
   }
   applyDocumentLocale(state.value)
   bindStorageSync()

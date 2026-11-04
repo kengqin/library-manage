@@ -5,8 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f3ee" />
     <title>library-manage</title>
+    <script>
+      // 启动动画只属于主窗口。splash 是静态 HTML，任何窗口加载首帧都会画出来，
+      // 所以这里必须在样式表之前、在页面绘制之前判定窗口身份。
+      // 辅助窗口（设置、软件更新、更新历史、浮层、内置浏览器）直接不渲染。
+      try {
+        var label = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.metadata && window.__TAURI_INTERNALS__.metadata.currentWindow
+          ? window.__TAURI_INTERNALS__.metadata.currentWindow.label
+          : ''
+        if (label && label !== 'main') {
+          var root = document.documentElement
+          root.setAttribute('data-aux-window', '')
+          // 辅助窗口没有 splash，窗口一显示就直接露出 body 底色。
+          // 用内容卡片色（--ui-surface）顶替主窗口的米色 #f7f3ee，
+          // 这样窗口出现时是与内容同色的底，而不是一块与内容无关的色块。
+          var dark = false
+          try {
+            var saved = localStorage.getItem('novel-library:appearance')
+            dark = saved === 'dark'
+              || (saved !== 'light'
+                && !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches))
+          } catch (error) { /* 读不到偏好就按浅色 */ }
+          root.setAttribute('data-aux-surface', dark ? 'dark' : 'light')
+        }
+      } catch (error) { /* 非 Tauri 环境按主窗口处理 */ }
+    </script>
     <style>
       html, body { margin: 0; width: 100%; height: 100%; background: #f7f3ee; }
+      /* 辅助窗口首帧底色 = 内容卡片色，避免窗口先显示时闪出主窗口的米色底 */
+      html[data-aux-window], html[data-aux-window] body { background: #fff; }
+      html[data-aux-surface="dark"], html[data-aux-surface="dark"] body { background: #20201f; }
+      html[data-aux-window] #startup-splash { display: none; }
       #startup-splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 0% 0%, #e6f7f7 0, transparent 42%), radial-gradient(ellipse at 85% 95%, #faf0f4 0, transparent 55%), #f7f3ee; transition: opacity .38s ease, visibility .38s ease; }
       .startup-splash__mark { width: 64px; height: 64px; animation: startup-appear .5s ease-out both; }
       .startup-splash__icon { display: block; width: 100%; height: 100%; overflow: visible; }

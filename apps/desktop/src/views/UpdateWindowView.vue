@@ -17,7 +17,9 @@ onMounted(async () => {
   const version = await getCurrentVersion()
   unlistenState = await initializeUpdateEvents()
   if (isTauri()) unlisten = await listen('application-update-check', () => { void checkForUpdates(false) })
-  const checking = route.query.check === '1' || !availableUpdate.value ? checkForUpdates(false) : Promise.resolve()
+  const checking = route.query.preload === '1'
+    ? Promise.resolve()
+    : route.query.check === '1' || !availableUpdate.value ? checkForUpdates(false) : Promise.resolve()
   currentVersion.value = version
   await checking
 })

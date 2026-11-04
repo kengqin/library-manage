@@ -4,10 +4,12 @@ import {
   MESSAGES,
   SUPPORTED_LOCALES,
   detectLocale,
+  detectLocaleFromTimeZone,
   interpolate,
   localeDirection,
   localeLabel,
   normalizeLocale,
+  resolveLocale,
   translate
 } from './index'
 
@@ -59,6 +61,12 @@ describe('normalizeLocale', () => {
     expect(normalizeLocale('ar-EG')).toBe('ar-SA')
   })
 
+  it('泰语标记与地区变体收敛到 th-TH', () => {
+    expect(normalizeLocale('th')).toBe('th-TH')
+    expect(normalizeLocale('th_TH')).toBe('th-TH')
+    expect(normalizeLocale('TH-th')).toBe('th-TH')
+  })
+
   it('简体与繁体分别收敛到 zh-CN / zh-TW', () => {
     expect(normalizeLocale('zh')).toBe('zh-CN')
     expect(normalizeLocale('zh-Hans-CN')).toBe('zh-CN')
@@ -72,14 +80,15 @@ describe('normalizeLocale', () => {
   it('空值与未支持的语言回退到默认语言', () => {
     expect(normalizeLocale(undefined)).toBe(DEFAULT_LOCALE)
     expect(normalizeLocale('')).toBe(DEFAULT_LOCALE)
-    expect(normalizeLocale('th-TH')).toBe(DEFAULT_LOCALE)
+    expect(normalizeLocale('hi-IN')).toBe(DEFAULT_LOCALE)
     expect(normalizeLocale('he-IL')).toBe(DEFAULT_LOCALE)
   })
 })
 
 describe('detectLocale', () => {
   it('取第一个受支持的浏览器语言', () => {
-    expect(detectLocale(['th-TH', 'en-US', 'zh-CN'])).toBe('en-US')
+    expect(detectLocale(['hi-IN', 'en-US', 'zh-CN'])).toBe('en-US')
+    expect(detectLocale(['th-TH', 'en-US'])).toBe('th-TH')
     expect(detectLocale(['zh-Hant', 'en-US'])).toBe('zh-TW')
     expect(detectLocale(['ja-JP', 'en-US'])).toBe('ja-JP')
     expect(detectLocale(['fr-CA', 'en-GB'])).toBe('fr-FR')
@@ -87,6 +96,121 @@ describe('detectLocale', () => {
     expect(detectLocale(['ar-EG', 'en-US'])).toBe('ar-SA')
     expect(detectLocale([])).toBe(DEFAULT_LOCALE)
     expect(detectLocale(undefined)).toBe(DEFAULT_LOCALE)
+  })
+})
+
+describe('detectLocaleFromTimeZone', () => {
+  it('中国大陆时区归到简体，台湾/香港/澳门归到繁体', () => {
+    expect(detectLocaleFromTimeZone('Asia/Shanghai')).toBe('zh-CN')
+    expect(detectLocaleFromTimeZone('Asia/Chongqing')).toBe('zh-CN')
+    expect(detectLocaleFromTimeZone('Asia/Urumqi')).toBe('zh-CN')
+    expect(detectLocaleFromTimeZone('Asia/Taipei')).toBe('zh-TW')
+    expect(detectLocaleFromTimeZone('Asia/Hong_Kong')).toBe('zh-TW')
+    expect(detectLocaleFromTimeZone('Asia/Macau')).toBe('zh-TW')
+  })
+
+  it('亚洲其余受支持语言各自命中', () => {
+    expect(detectLocaleFromTimeZone('Asia/Tokyo')).toBe('ja-JP')
+    expect(detectLocaleFromTimeZone('Asia/Seoul')).toBe('ko-KR')
+    expect(detectLocaleFromTimeZone('Asia/Bangkok')).toBe('th-TH')
+    expect(detectLocaleFromTimeZone('Asia/Ho_Chi_Minh')).toBe('vi-VN')
+    expect(detectLocaleFromTimeZone('Asia/Jakarta')).toBe('id-ID')
+    expect(detectLocaleFromTimeZone('Asia/Riyadh')).toBe('ar-SA')
+    expect(detectLocaleFromTimeZone('Africa/Cairo')).toBe('ar-SA')
+  })
+
+  it('欧洲与美洲时区按主要语言命中', () => {
+    expect(detectLocaleFromTimeZone('Europe/Berlin')).toBe('de-DE')
+    expect(detectLocaleFromTimeZone('Europe/Zurich')).toBe('de-DE')
+    expect(detectLocaleFromTimeZone('Europe/Paris')).toBe('fr-FR')
+    expect(detectLocaleFromTimeZone('Europe/Madrid')).toBe('es-ES')
+    expect(detectLocaleFromTimeZone('America/Mexico_City')).toBe('es-ES')
+    expect(detectLocaleFromTimeZone('Europe/Rome')).toBe('it-IT')
+    expect(detectLocaleFromTimeZone('America/Sao_Paulo')).toBe('pt-BR')
+    expect(detectLocaleFromTimeZone('Europe/Lisbon')).toBe('pt-BR')
+    expect(detectLocaleFromTimeZone('Europe/Moscow')).toBe('ru-RU')
+    expect(detectLocaleFromTimeZone('Europe/Istanbul')).toBe('tr-TR')
+    expect(detectLocaleFromTimeZone('Europe/Warsaw')).toBe('pl-PL')
+    expect(detectLocaleFromTimeZone('Europe/Prague')).toBe('cs-CZ')
+    expect(detectLocaleFromTimeZone('Europe/London')).toBe('en-US')
+    expect(detectLocaleFromTimeZone('America/New_York')).toBe('en-US')
+  })
+
+  it('按前缀兜住整片区域：澳大利亚与阿根廷', () => {
+    expect(detectLocaleFromTimeZone('Australia/Sydney')).toBe('en-US')
+    expect(detectLocaleFromTimeZone('Australia/Perth')).toBe('en-US')
+    expect(detectLocaleFromTimeZone('Australia/Eucla')).toBe('en-US')
+    expect(detectLocaleFromTimeZone('America/Argentina/Salta')).toBe('es-ES')
+  })
+
+  it('大小写与空白不影响判定', () => {
+    expect(detectLocaleFromTimeZone('  asia/shanghai  ')).toBe('zh-CN')
+    expect(detectLocaleFromTimeZone('ASIA/TOKYO')).toBe('ja-JP')
+    expect(detectLocaleFromTimeZone('europe/berlin')).toBe('de-DE')
+  })
+
+  it('未收录或无法解析的时区返回 undefined，不做地理硬猜', () => {
+    expect(detectLocaleFromTimeZone('Asia/Yangon')).toBeUndefined()
+    expect(detectLocaleFromTimeZone('Asia/Phnom_Penh')).toBeUndefined()
+    expect(detectLocaleFromTimeZone('Africa/Addis_Ababa')).toBeUndefined()
+    expect(detectLocaleFromTimeZone('UTC')).toBeUndefined()
+    expect(detectLocaleFromTimeZone('')).toBeUndefined()
+    expect(detectLocaleFromTimeZone('   ')).toBeUndefined()
+    expect(detectLocaleFromTimeZone(undefined)).toBeUndefined()
+    expect(detectLocaleFromTimeZone(null)).toBeUndefined()
+  })
+})
+
+describe('resolveLocale', () => {
+  it('系统语言受支持时优先于时区', () => {
+    expect(resolveLocale({ languages: ['ja-JP'], timeZone: 'Europe/Berlin' })).toEqual({
+      locale: 'ja-JP',
+      reason: 'system-language',
+      matched: 'ja-JP'
+    })
+  })
+
+  it('取语言偏好里第一个受支持项，跳过不受支持的', () => {
+    expect(resolveLocale({ languages: ['he-IL', 'ko-KR', 'en-US'] }).locale).toBe('ko-KR')
+    expect(resolveLocale({ languages: ['he-IL', 'hi-IN'], timeZone: 'Asia/Seoul' }).locale).toBe('ko-KR')
+  })
+
+  it('泰语系统直接命中泰语，不再走时区', () => {
+    expect(resolveLocale({ languages: ['th-TH', 'en-US'], timeZone: 'Asia/Shanghai' })).toEqual({
+      locale: 'th-TH',
+      reason: 'system-language',
+      matched: 'th-TH'
+    })
+  })
+
+  it('系统语言不受支持时回退到本机时区', () => {
+    expect(resolveLocale({ languages: ['he-IL'], timeZone: 'Asia/Shanghai' })).toEqual({
+      locale: 'zh-CN',
+      reason: 'time-zone',
+      matched: 'Asia/Shanghai'
+    })
+    expect(resolveLocale({ languages: ['he-IL'], timeZone: 'Europe/Berlin' }).locale).toBe('de-DE')
+    expect(resolveLocale({ languages: ['he-IL'], timeZone: 'Asia/Bangkok' }).locale).toBe('th-TH')
+  })
+
+  it('语言与时区都不匹配时回到中文', () => {
+    expect(resolveLocale({ languages: ['he-IL'], timeZone: 'Asia/Yangon' })).toEqual({
+      locale: DEFAULT_LOCALE,
+      reason: 'fallback'
+    })
+    expect(resolveLocale({ languages: ['he-IL'], timeZone: 'UTC' }).locale).toBe('zh-CN')
+  })
+
+  it('拿不到任何系统信息也稳定回退中文', () => {
+    expect(resolveLocale()).toEqual({ locale: 'zh-CN', reason: 'fallback' })
+    expect(resolveLocale({})).toEqual({ locale: 'zh-CN', reason: 'fallback' })
+    expect(resolveLocale({ languages: [], timeZone: undefined })).toEqual({ locale: 'zh-CN', reason: 'fallback' })
+    expect(resolveLocale({ languages: null, timeZone: null })).toEqual({ locale: 'zh-CN', reason: 'fallback' })
+    expect(resolveLocale({ languages: ['', '  '], timeZone: '   ' })).toEqual({ locale: 'zh-CN', reason: 'fallback' })
+  })
+
+  it('falsy 语言项不会让判定抛错', () => {
+    expect(resolveLocale({ languages: [undefined as unknown as string, 'fr-FR'] }).locale).toBe('fr-FR')
   })
 })
 
@@ -111,6 +235,7 @@ describe('translate', () => {
     expect(translate('it-IT', 'common.save')).toBe('Salva')
     expect(translate('pt-BR', 'common.save')).toBe('Salvar')
     expect(translate('ru-RU', 'common.save')).toBe('Сохранить')
+    expect(translate('th-TH', 'common.save')).toBe('บันทึก')
     expect(translate('tr-TR', 'common.save')).toBe('Kaydet')
     expect(translate('pl-PL', 'common.save')).toBe('Zapisz')
     expect(translate('cs-CZ', 'common.save')).toBe('Uložit')
@@ -147,6 +272,7 @@ describe('localeLabel', () => {
     expect(localeLabel('it-IT')).toBe('Italiano')
     expect(localeLabel('pt-BR')).toBe('Português (Brasil)')
     expect(localeLabel('ru-RU')).toBe('Русский')
+    expect(localeLabel('th-TH')).toBe('ไทย')
     expect(localeLabel('tr-TR')).toBe('Türkçe')
     expect(localeLabel('pl-PL')).toBe('Polski')
     expect(localeLabel('cs-CZ')).toBe('Čeština')
