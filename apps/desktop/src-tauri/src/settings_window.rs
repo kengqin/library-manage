@@ -88,7 +88,7 @@ fn build_settings_window(app: &AppHandle, section: &str) -> Result<(), String> {
     .decorations(false)
     .visible(false)
     .center()
-    .on_navigation(move |url| same_origin(&url, &origin))
+    .on_navigation(move |url| same_origin(url, &origin))
     .build()
     .map_err(|error| error.to_string())?;
     Ok(())
@@ -110,7 +110,7 @@ fn build_release_history_window(app: &AppHandle) -> Result<(), String> {
     .decorations(false)
     .visible(false)
     .center()
-    .on_navigation(move |url| same_origin(&url, &origin));
+    .on_navigation(move |url| same_origin(url, &origin));
     // 预创建时还不知道谁会把窗口叫出来，owner 留到显示时再挂，
     // 否则更新历史会挂在主窗口下、被设置窗口盖住。
     builder.build().map_err(|error| error.to_string())?;
@@ -141,7 +141,7 @@ fn build_update_window(app: &AppHandle, check: bool) -> Result<(), String> {
         .decorations(false)
         .visible(false)
         .center()
-        .on_navigation(move |url| same_origin(&url, &origin))
+        .on_navigation(move |url| same_origin(url, &origin))
         .build()
         .map_err(|error| error.to_string())?;
     Ok(())
