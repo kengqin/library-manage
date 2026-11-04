@@ -470,6 +470,8 @@ fn set_window_palette(window: tauri::Window, palette: Option<String>) -> Result<
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 只有 debug 构建会就地改写窗口配置，release 下这个 `mut` 用不到。
+    #[allow(unused_mut)]
     let mut context = tauri::generate_context!();
     #[cfg(debug_assertions)]
     if let Some(directory) = std::env::var_os("NOVEL_LIBRARY_TEST_DATA_DIRECTORY") {
