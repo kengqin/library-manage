@@ -14,7 +14,7 @@
       "requiresBackup": false,
       "releaseUrl": "https://github.com/kengqin/library-manage/releases/tag/v0.10.0",
       "installerUrl": "https://github.com/kengqin/library-manage/releases/download/v0.10.0/library-manage_0.10.0_x64-setup.exe",
-      "sha256": "",
+      "sha256": "355fcacd2989e99c3f21b209ab6f1fef881c033fe52d48d704b970a1d1dbabb6",
       "sections": [
         {
           "title": "变更",
